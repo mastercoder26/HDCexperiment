@@ -1,15 +1,34 @@
-"""
-A "hypervector" is just a big list of random -1s and 1s.
+"""Creation of random bipolar hypervectors."""
 
-Two random hypervectors are almost always very different from each other.
-That's the one trick the whole simulator is built on.
-"""
+from __future__ import annotations
+
 import numpy as np
+from numpy.typing import NDArray
 
-DIM = 10000  # how many numbers are in each hypervector
+DIM = 10_000
+Hypervector = NDArray[np.int8]
 
 
-def random_vector():
-    """Make a new random hypervector."""
-    return np.random.choice([-1, 1], size=DIM)
+def random_vector(
+    dimensions: int = DIM,
+    *,
+    rng: np.random.Generator | None = None,
+    seed: int | None = None,
+) -> Hypervector:
+    """Create a random bipolar hypervector.
+
+    Pass a generator when several calls must share one deterministic random
+    stream. Pass a seed for a convenient reproducible standalone call.
+    """
+
+    if isinstance(dimensions, bool) or not isinstance(dimensions, int):
+        raise ValueError("dimensions must be a positive integer")
+    if dimensions <= 0:
+        raise ValueError("dimensions must be a positive integer")
+    if rng is not None and seed is not None:
+        raise ValueError("provide either rng or seed, not both")
+
+    generator = rng if rng is not None else np.random.default_rng(seed)
+    values = np.array([-1, 1], dtype=np.int8)
+    return generator.choice(values, size=dimensions)
 #
