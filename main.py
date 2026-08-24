@@ -29,7 +29,7 @@ TEST_RECORDS = [
 
 
 def read_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run a small HDC IoT example.")
+    parser = argparse.ArgumentParser(description="Run a generic HDC example.")
     parser.add_argument(
         "--dimensions",
         type=int,
