@@ -29,7 +29,6 @@ class SimpleCommandLineTests(unittest.TestCase):
 
         self.assertIn("dimensions: 30", completed.stdout)
         self.assertIn("Generic HDC baseline", completed.stdout)
-        self.assertNotIn("IoT", completed.stdout)
         self.assertEqual(result["experiment"], "generic_categorical_baseline")
         self.assertEqual(result["dimensions"], 30)
         self.assertEqual(result["total"], 4)

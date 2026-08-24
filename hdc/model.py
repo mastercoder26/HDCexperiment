@@ -22,7 +22,7 @@ class HDCClassifier:
         # item_memory remembers the random vector assigned to each word/value.
         self.item_memory: dict[str, np.ndarray] = {}
 
-        # prototypes will hold one learned vector per class, such as "normal".
+        # prototypes will hold one learned vector per class.
         self.prototypes: dict[str, np.ndarray] = {}
 
     def vector_for(self, token: str) -> np.ndarray:

@@ -1,13 +1,10 @@
-# HDCbase
+# Generic HDC Baseline
 
-A small, beginner-friendly Hyperdimensional Computing (HDC) simulator. It learns
-to label tiny IoT records as `normal` or `anomaly` and counts the work performed
-by the HDC algorithm.
+A small Hyperdimensional Computing baseline for learning from categorical data.
+It demonstrates the standard HDC operations without being tied to a particular
+application or hardware device.
 
-This is an algorithm experiment, not a hardware emulator and not a real anomaly
-detector yet.
-
-## Run it
+## Run
 
 ~~~bash
 python3 -m venv .venv
@@ -15,59 +12,53 @@ python3 -m venv .venv
 .venv/bin/python main.py --dimensions 10000 --seed 42
 ~~~
 
-Try the exact command that caused confusion earlier:
+## What it demonstrates
 
-~~~bash
-.venv/bin/python main.py --dimensions 30 --seed 42
-~~~
+- random bipolar hypervectors containing `-1` and `+1`;
+- binding, bundling, permutation, and similarity;
+- encoding categorical records into hypervectors;
+- bundling training examples into one prototype per class;
+- choosing the most similar prototype for prediction;
+- counting operation calls and vector work;
+- optional analytical energy and latency estimates.
 
-The vectors will have 30 entries. `DEFAULT_DIMENSIONS = 10_000` in `core.py` is
-used only when you omit `--dimensions`. The path is:
+The included `class_a` and `class_b` records are intentionally generic. They are
+only a working demonstration of the HDC pipeline, not a real research dataset.
+
+## Files
 
 ~~~text
-command line --dimensions 30
-        -> args.dimensions in main.py
-        -> HDC(dimensions=30)
-        -> self.dimensions in core.py
-        -> every new vector has size self.dimensions
+main.py       example data, settings, training, evaluation, and output
+hdc/core.py   HDC operations and simulator counters
+hdc/model.py  categorical encoding, prototypes, and prediction
+tests/        automated checks
 ~~~
 
-Save the result as JSON:
+## Customize it
+
+Change dimensions or the repeatable random seed:
 
 ~~~bash
-.venv/bin/python main.py --dimensions 10000 --seed 42 \
-    --output baseline-result.json
+.venv/bin/python main.py --dimensions 5000 --seed 7
 ~~~
 
-Add example analytical costs:
+Add placeholder analytical costs:
 
 ~~~bash
-.venv/bin/python main.py --dimensions 1000 --seed 42 \
+.venv/bin/python main.py --dimensions 5000 \
     --energy-cost 0.1 --latency-cost 0.2
 ~~~
 
-Those costs are adjustable placeholders, not measurements from real hardware.
+Edit `TRAINING_RECORDS` and `TEST_RECORDS` near the top of `main.py` to try
+different labels, fields, and categorical values. Python experiments can also
+pass different energy or latency values for each operation directly to `HDC`.
 
-## Only three runtime files
+## Meeting summary
 
-~~~text
-main.py       example data, command-line settings, train/test run, printing
-hdc/core.py   vectors, bind, bundle, permute, similarity, work counters
-hdc/model.py  record encoding, prototypes, prediction, accuracy, memory
-~~~
-
-`hdc/__init__.py` only exposes the three useful Python names. The `tests/`
-directory checks behavior but is not part of the simulator's runtime.
-
-## What one run does
-
-1. Assigns stable random vectors to field names and values.
-2. Binds each field name to its value.
-3. Bundles the field pairs into one vector for the whole record.
-4. Bundles training records into a `normal` and an `anomaly` prototype.
-5. Compares each test record to both prototypes.
-6. Chooses the label with the higher similarity.
-7. Reports accuracy, memory, operation counts, and optional cost estimates.
+This is an algorithm-level HDC simulator, not a cycle-accurate hardware
+simulator. It provides a working, customizable baseline. The next research step
+is to select a paper or dataset, reproduce its baseline, and then compare one
+controlled change at a time.
 
 ## Tests
 
@@ -76,8 +67,3 @@ directory checks behavior but is not part of the simulator's runtime.
 .venv/bin/coverage run --branch --source=hdc -m unittest discover
 .venv/bin/coverage report -m
 ~~~
-
-## Read next
-
-- [Beginner HDC and code guide](docs/HDC_RESEARCH_GUIDE.md)
-- [Professor meeting brief](docs/PROFESSOR_MEETING_BRIEF.md)
