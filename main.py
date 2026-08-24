@@ -1,4 +1,4 @@
-"""Command-line entry point for the toy IoT HDC baseline."""
+"""Run the beginner HDC classifier on a tiny IoT example."""
 
 from __future__ import annotations
 
@@ -6,124 +6,122 @@ import argparse
 import json
 from pathlib import Path
 
-from hdc import CostModel, HDCConfig
-from hdc.experiment import ExperimentResult, run_iot_baseline
+from hdc.core import DEFAULT_DIMENSIONS, OPERATIONS, HDC
+from hdc.model import HDCClassifier
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Run the modular bipolar HDC IoT baseline.",
+# These small examples make the program easy to demonstrate and inspect.
+TRAINING_RECORDS = [
+    ("normal", {"protocol": "mqtt", "encryption": "on", "rate": "low"}),
+    ("normal", {"protocol": "https", "encryption": "on", "rate": "low"}),
+    ("normal", {"protocol": "ssh", "encryption": "on", "rate": "medium"}),
+    ("anomaly", {"protocol": "telnet", "encryption": "off", "rate": "high"}),
+    ("anomaly", {"protocol": "ftp", "encryption": "off", "rate": "high"}),
+    ("anomaly", {"protocol": "ssh", "encryption": "off", "rate": "high"}),
+]
+
+TEST_RECORDS = [
+    ("normal", {"protocol": "mqtt", "encryption": "on", "rate": "low"}),
+    ("normal", {"protocol": "https", "encryption": "on", "rate": "low"}),
+    ("anomaly", {"protocol": "telnet", "encryption": "off", "rate": "high"}),
+    ("anomaly", {"protocol": "ssh", "encryption": "off", "rate": "high"}),
+]
+
+
+def read_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run a small HDC IoT example.")
+    parser.add_argument(
+        "--dimensions",
+        type=int,
+        default=DEFAULT_DIMENSIONS,
+        help=f"hypervector length (default: {DEFAULT_DIMENSIONS})",
     )
-    parser.add_argument("--dimensions", type=int, default=10_000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
-        "--tie-breaker",
-        choices=("random", "positive", "negative"),
-        default="positive",
-    )
-    parser.add_argument(
-        "--energy-pj-per-work-unit",
+        "--energy-cost",
         type=float,
         default=0.0,
-        help="Example analytical coefficient; not a measured value.",
+        help="estimated picojoules per work unit",
     )
     parser.add_argument(
-        "--latency-ns-per-work-unit",
+        "--latency-cost",
         type=float,
         default=0.0,
-        help="Example analytical coefficient; not a measured value.",
+        help="estimated nanoseconds per work unit",
     )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        help="Optional path for the full JSON report.",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Print the full JSON report instead of the readable summary.",
-    )
-    return parser
+    parser.add_argument("--output", type=Path, help="optional JSON output path")
+    return parser.parse_args()
 
 
-def _cost_model_from_args(args: argparse.Namespace) -> CostModel:
-    if (
-        args.energy_pj_per_work_unit == 0
-        and args.latency_ns_per_work_unit == 0
-    ):
-        return CostModel()
-    return CostModel.uniform(
-        name="cli-example-uniform",
-        energy_pj_per_work_unit=args.energy_pj_per_work_unit,
-        latency_ns_per_work_unit=args.latency_ns_per_work_unit,
-    )
-
-
-def print_summary(result: ExperimentResult) -> None:
-    report = result.simulation_report
-    print(result.experiment_name)
-    print(f"dataset:    {result.dataset_name}")
-    print(f"dimensions: {report.config.dimensions}")
-    print(f"seed:       {report.config.seed}")
+def print_result(result: dict[str, object]) -> None:
+    print("HDC IoT baseline")
+    print(f"dimensions: {result['dimensions']}")
+    print(f"seed:       {result['seed']}")
     print(
-        "accuracy:   "
-        f"{result.correct_predictions}/{len(result.predictions)} "
-        f"({result.accuracy:.1%})"
+        f"accuracy:   {result['correct']}/{result['total']} "
+        f"({result['accuracy']:.1%})"
     )
-    print()
-    print("predictions:")
-    for prediction in result.predictions:
+
+    print("\npredictions:")
+    for prediction in result["predictions"]:
         scores = ", ".join(
             f"{label}={score:.3f}"
-            for label, score in sorted(prediction.scores.items())
+            for label, score in sorted(prediction["scores"].items())
         )
         print(
-            f"  true={prediction.true_label:<7} "
-            f"predicted={prediction.predicted_label:<7} "
-            f"margin={prediction.margin:.3f} ({scores})"
+            f"  true={prediction['true_label']:<7} "
+            f"predicted={prediction['predicted_label']:<7} "
+            f"margin={prediction['margin']:.3f} ({scores})"
         )
-    print()
-    print("operation metrics:")
-    for operation, stats in sorted(report.operations.items()):
-        print(
-            f"  {operation:<10} calls={stats.calls:<3} "
-            f"work_units={stats.work_units:<8} "
-            f"runtime_ns={stats.measured_runtime_ns}"
-        )
+
+    simulation = result["simulation"]
+    print("\noperation counts:")
+    for name, details in simulation["operations"].items():
+        if details["calls"]:
+            print(
+                f"  {name:<10} calls={details['calls']:<3} "
+                f"work_units={details['work_units']}"
+            )
     print(
-        "modeled totals: "
-        f"{report.total_modeled_energy_pj:.3f} pJ, "
-        f"{report.total_modeled_latency_ns:.3f} ns "
-        f"(profile: {report.cost_profile})"
+        "estimated totals: "
+        f"{simulation['total_energy_pj']:.3f} pJ, "
+        f"{simulation['total_latency_ns']:.3f} ns"
     )
 
 
 def main() -> int:
-    args = build_parser().parse_args()
-    config = HDCConfig(
+    args = read_arguments()
+
+    # The CLI uses one simple cost for every operation. Python users can pass
+    # different values per operation directly to HDC if an experiment needs it.
+    energy_costs = {name: args.energy_cost for name in OPERATIONS}
+    latency_costs = {name: args.latency_cost for name in OPERATIONS}
+    hdc = HDC(
         dimensions=args.dimensions,
         seed=args.seed,
-        tie_breaker=args.tie_breaker,
+        energy_costs=energy_costs,
+        latency_costs=latency_costs,
     )
-    result = run_iot_baseline(
-        config,
-        cost_model=_cost_model_from_args(args),
-    )
-    payload = result.to_dict()
 
-    if args.output is not None:
+    classifier = HDCClassifier(hdc)
+    classifier.train(TRAINING_RECORDS)
+    evaluation = classifier.evaluate(TEST_RECORDS)
+
+    result = {
+        "dimensions": args.dimensions,
+        "seed": args.seed,
+        **evaluation,
+        "memory_bytes": classifier.memory_bytes(),
+        "simulation": hdc.report(),
+        # Kept so older saved-report readers can still find these two values.
+        "config": {"dimensions": args.dimensions, "seed": args.seed},
+    }
+
+    if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(
-            json.dumps(payload, indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
+        args.output.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
-    if args.json:
-        print(json.dumps(payload, indent=2, sort_keys=True))
-    else:
-        print_summary(result)
-        if args.output is not None:
-            print(f"report:     {args.output}")
+    print_result(result)
     return 0
 
 
