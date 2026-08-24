@@ -1,4 +1,4 @@
-"""A small HDC classifier for normal and anomalous IoT records."""
+"""A small HDC classifier for generic categorical records."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ class HDCClassifier:
         return self.item_memory[token].copy()
 
     def encode(self, record: Record) -> np.ndarray:
-        """Turn a dictionary such as an IoT event into one hypervector."""
+        """Turn a categorical dictionary into one hypervector."""
         if not record:
             raise ValueError("cannot encode an empty record")
 
