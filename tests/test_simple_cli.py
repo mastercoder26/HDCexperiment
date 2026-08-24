@@ -1,0 +1,37 @@
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+class SimpleCommandLineTests(unittest.TestCase):
+    def test_command_line_dimension_reaches_saved_result(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "result.json"
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "main.py",
+                    "--dimensions",
+                    "30",
+                    "--seed",
+                    "42",
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertIn("dimensions: 30", completed.stdout)
+        self.assertEqual(result["dimensions"], 30)
+        self.assertEqual(result["total"], 4)
+        self.assertIn("operations", result["simulation"])
+
+
+if __name__ == "__main__":
+    unittest.main()
