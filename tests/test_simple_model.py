@@ -7,12 +7,12 @@ from hdc.model import HDCClassifier
 
 
 TRAINING_RECORDS = [
-    ("normal", {"protocol": "mqtt", "encryption": "on", "rate": "low"}),
-    ("normal", {"protocol": "coap", "encryption": "on", "rate": "low"}),
-    ("normal", {"protocol": "mqtt", "encryption": "on", "rate": "medium"}),
-    ("anomaly", {"protocol": "telnet", "encryption": "off", "rate": "high"}),
-    ("anomaly", {"protocol": "ftp", "encryption": "off", "rate": "high"}),
-    ("anomaly", {"protocol": "telnet", "encryption": "off", "rate": "medium"}),
+    ("class_a", {"color": "red", "shape": "circle", "size": "small"}),
+    ("class_a", {"color": "orange", "shape": "circle", "size": "small"}),
+    ("class_a", {"color": "red", "shape": "square", "size": "medium"}),
+    ("class_b", {"color": "blue", "shape": "triangle", "size": "large"}),
+    ("class_b", {"color": "green", "shape": "triangle", "size": "large"}),
+    ("class_b", {"color": "blue", "shape": "square", "size": "medium"}),
 ]
 
 
@@ -22,14 +22,14 @@ class SimpleClassifierTests(unittest.TestCase):
         self.classifier = HDCClassifier(self.hdc)
 
     def test_same_token_gets_same_vector(self):
-        first = self.classifier.vector_for("protocol")
-        second = self.classifier.vector_for("protocol")
+        first = self.classifier.vector_for("color")
+        second = self.classifier.vector_for("color")
 
         np.testing.assert_array_equal(first, second)
 
     def test_record_order_does_not_change_encoding(self):
-        first = self.classifier.encode({"protocol": "mqtt", "rate": "low"})
-        second = self.classifier.encode({"rate": "low", "protocol": "mqtt"})
+        first = self.classifier.encode({"color": "red", "shape": "circle"})
+        second = self.classifier.encode({"shape": "circle", "color": "red"})
 
         self.assertEqual(self.hdc.similarity(first, second), 1.0)
 
@@ -37,18 +37,18 @@ class SimpleClassifierTests(unittest.TestCase):
         self.classifier.train(TRAINING_RECORDS)
 
         result = self.classifier.predict(
-            {"protocol": "mqtt", "encryption": "on", "rate": "low"}
+            {"color": "red", "shape": "circle", "size": "small"}
         )
 
-        self.assertEqual(result["label"], "normal")
+        self.assertEqual(result["label"], "class_a")
         self.assertGreater(result["margin"], 0)
-        self.assertEqual(set(result["scores"]), {"normal", "anomaly"})
+        self.assertEqual(set(result["scores"]), {"class_a", "class_b"})
 
     def test_evaluate_returns_accuracy_and_predictions(self):
         self.classifier.train(TRAINING_RECORDS)
         test_records = [
-            ("normal", {"protocol": "https", "encryption": "on", "rate": "low"}),
-            ("anomaly", {"protocol": "ssh", "encryption": "off", "rate": "high"}),
+            ("class_a", {"color": "orange", "shape": "circle", "size": "small"}),
+            ("class_b", {"color": "green", "shape": "triangle", "size": "large"}),
         ]
 
         result = self.classifier.evaluate(test_records)
@@ -60,7 +60,7 @@ class SimpleClassifierTests(unittest.TestCase):
 
     def test_prediction_before_training_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "train"):
-            self.classifier.predict({"protocol": "mqtt"})
+            self.classifier.predict({"color": "red"})
 
     def test_memory_size_counts_items_and_prototypes(self):
         self.classifier.train(TRAINING_RECORDS)
