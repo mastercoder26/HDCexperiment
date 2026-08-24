@@ -1,4 +1,4 @@
-"""Run the beginner HDC classifier on a tiny IoT example."""
+"""Run a generic HDC classifier on a small categorical example."""
 
 from __future__ import annotations
 
@@ -10,21 +10,21 @@ from hdc.core import DEFAULT_DIMENSIONS, OPERATIONS, HDC
 from hdc.model import HDCClassifier
 
 
-# These small examples make the program easy to demonstrate and inspect.
+# Replace these records and labels to try a different categorical problem.
 TRAINING_RECORDS = [
-    ("normal", {"protocol": "mqtt", "encryption": "on", "rate": "low"}),
-    ("normal", {"protocol": "https", "encryption": "on", "rate": "low"}),
-    ("normal", {"protocol": "ssh", "encryption": "on", "rate": "medium"}),
-    ("anomaly", {"protocol": "telnet", "encryption": "off", "rate": "high"}),
-    ("anomaly", {"protocol": "ftp", "encryption": "off", "rate": "high"}),
-    ("anomaly", {"protocol": "ssh", "encryption": "off", "rate": "high"}),
+    ("class_a", {"color": "red", "shape": "circle", "size": "small"}),
+    ("class_a", {"color": "orange", "shape": "circle", "size": "small"}),
+    ("class_a", {"color": "red", "shape": "square", "size": "medium"}),
+    ("class_b", {"color": "blue", "shape": "triangle", "size": "large"}),
+    ("class_b", {"color": "green", "shape": "triangle", "size": "large"}),
+    ("class_b", {"color": "blue", "shape": "square", "size": "medium"}),
 ]
 
 TEST_RECORDS = [
-    ("normal", {"protocol": "mqtt", "encryption": "on", "rate": "low"}),
-    ("normal", {"protocol": "https", "encryption": "on", "rate": "low"}),
-    ("anomaly", {"protocol": "telnet", "encryption": "off", "rate": "high"}),
-    ("anomaly", {"protocol": "ssh", "encryption": "off", "rate": "high"}),
+    ("class_a", {"color": "orange", "shape": "square", "size": "small"}),
+    ("class_a", {"color": "red", "shape": "circle", "size": "medium"}),
+    ("class_b", {"color": "green", "shape": "square", "size": "large"}),
+    ("class_b", {"color": "blue", "shape": "triangle", "size": "medium"}),
 ]
 
 
@@ -54,7 +54,7 @@ def read_arguments() -> argparse.Namespace:
 
 
 def print_result(result: dict[str, object]) -> None:
-    print("HDC IoT baseline")
+    print("Generic HDC baseline")
     print(f"dimensions: {result['dimensions']}")
     print(f"seed:       {result['seed']}")
     print(
@@ -108,6 +108,7 @@ def main() -> int:
     evaluation = classifier.evaluate(TEST_RECORDS)
 
     result = {
+        "experiment": "generic_categorical_baseline",
         "dimensions": args.dimensions,
         "seed": args.seed,
         **evaluation,
