@@ -12,3 +12,4 @@ DIM = 10000  # how many numbers are in each hypervector
 def random_vector():
     """Make a new random hypervector."""
     return np.random.choice([-1, 1], size=DIM)
+#
