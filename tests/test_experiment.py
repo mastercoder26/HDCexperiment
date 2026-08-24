@@ -1,5 +1,6 @@
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -96,7 +97,7 @@ class BaselineExperimentTests(unittest.TestCase):
 
             completed = subprocess.run(
                 [
-                    str(Path(".venv/bin/python").resolve()),
+                    sys.executable,
                     "main.py",
                     "--dimensions",
                     "1000",
