@@ -1,12 +1,13 @@
 # HDCbase
 
-A modular bipolar Hyperdimensional Computing simulator for reproducible algorithm experiments and replaceable analytical edge-device cost assumptions.
+A small, beginner-friendly Hyperdimensional Computing (HDC) simulator. It learns
+to label tiny IoT records as `normal` or `anomaly` and counts the work performed
+by the HDC algorithm.
 
-The included baseline encodes categorical IoT records, trains one normal and one anomaly prototype, classifies four toy test records, and reports similarities, prediction margins, memory, operation counts, abstract work units, measured NumPy runtime, and modeled cost.
+This is an algorithm experiment, not a hardware emulator and not a real anomaly
+detector yet.
 
-This is an algorithm-level research baseline. It is not a cycle-accurate hardware simulator, and its toy accuracy is not evidence of real-world IoT performance.
-
-## Quick start
+## Run it
 
 ~~~bash
 python3 -m venv .venv
@@ -14,87 +15,69 @@ python3 -m venv .venv
 .venv/bin/python main.py --dimensions 10000 --seed 42
 ~~~
 
-Save the full JSON report:
+Try the exact command that caused confusion earlier:
 
 ~~~bash
-.venv/bin/python main.py \
-    --dimensions 10000 \
-    --seed 42 \
+.venv/bin/python main.py --dimensions 30 --seed 42
+~~~
+
+The vectors will have 30 entries. `DEFAULT_DIMENSIONS = 10_000` in `core.py` is
+used only when you omit `--dimensions`. The path is:
+
+~~~text
+command line --dimensions 30
+        -> args.dimensions in main.py
+        -> HDC(dimensions=30)
+        -> self.dimensions in core.py
+        -> every new vector has size self.dimensions
+~~~
+
+Save the result as JSON:
+
+~~~bash
+.venv/bin/python main.py --dimensions 10000 --seed 42 \
     --output baseline-result.json
 ~~~
 
-Run with example analytical coefficients:
+Add example analytical costs:
 
 ~~~bash
-.venv/bin/python main.py \
-    --dimensions 1000 \
-    --seed 42 \
-    --energy-pj-per-work-unit 0.1 \
-    --latency-ns-per-work-unit 0.2
+.venv/bin/python main.py --dimensions 1000 --seed 42 \
+    --energy-cost 0.1 --latency-cost 0.2
 ~~~
 
-Those command-line coefficients are examples, not measured hardware values. Research reports should use a named profile derived from a paper or target-device measurement.
+Those costs are adjustable placeholders, not measurements from real hardware.
 
-## What is implemented
-
-- Configurable hypervector dimension and seed.
-- Bipolar -1/+1 representation.
-- Binding by element-wise multiplication.
-- Tie-safe multi-vector bundling.
-- Positive, negative, and seeded-random tie policies.
-- Cyclic permutation.
-- Normalized dot-product similarity.
-- Input and dimension validation.
-- Stable item memory.
-- Nearest-match associative memory.
-- Categorical role-value record encoding.
-- One-prototype-per-class classification.
-- Prediction scores and margins.
-- Per-operation calls, work units, and host runtime.
-- Replaceable operation-specific energy and latency profiles.
-- JSON-compatible experiment reports.
-- Unit and command-line integration tests.
-
-## Project structure
+## Only three runtime files
 
 ~~~text
-main.py                 command-line baseline
-hdc/
-  config.py             immutable HDC configuration
-  vectors.py            bipolar vector generation
-  ops.py                bind, bundle, permute, similarity
-  costs.py              analytical cost profiles
-  simulator.py          operation instrumentation and reports
-  memory.py             item and associative memories
-  encoding.py           categorical role-value encoder
-  experiment.py         prototype classifier and toy IoT run
-tests/                  unit and integration tests
-docs/
-  HDC_RESEARCH_GUIDE.md
-  PROFESSOR_MEETING_BRIEF.md
+main.py       example data, command-line settings, train/test run, printing
+hdc/core.py   vectors, bind, bundle, permute, similarity, work counters
+hdc/model.py  record encoding, prototypes, prediction, accuracy, memory
 ~~~
 
-## Test and coverage
+`hdc/__init__.py` only exposes the three useful Python names. The `tests/`
+directory checks behavior but is not part of the simulator's runtime.
+
+## What one run does
+
+1. Assigns stable random vectors to field names and values.
+2. Binds each field name to its value.
+3. Bundles the field pairs into one vector for the whole record.
+4. Bundles training records into a `normal` and an `anomaly` prototype.
+5. Compares each test record to both prototypes.
+6. Chooses the label with the higher similarity.
+7. Reports accuracy, memory, operation counts, and optional cost estimates.
+
+## Tests
 
 ~~~bash
 .venv/bin/python -m unittest discover -v
-.venv/bin/coverage erase
-.venv/bin/coverage run --branch -m unittest discover
+.venv/bin/coverage run --branch --source=hdc -m unittest discover
 .venv/bin/coverage report -m
 ~~~
 
-The current suite contains 39 passing tests and reports 94% branch-aware coverage across the hdc package.
+## Read next
 
-## Research notes
-
-- [HDC research guide and simulator plan](docs/HDC_RESEARCH_GUIDE.md)
+- [Beginner HDC and code guide](docs/HDC_RESEARCH_GUIDE.md)
 - [Professor meeting brief](docs/PROFESSOR_MEETING_BRIEF.md)
-
-## Important interpretation boundaries
-
-- Measured runtime is Python/NumPy time on the host machine.
-- Modeled latency and energy come only from the configured analytical profile.
-- An unconfigured profile correctly reports zero modeled cost.
-- NumPy stores each current bipolar component as int8. Packed binary hardware can have a different memory cost.
-- The built-in dataset is deliberately tiny and only validates the end-to-end mechanics.
-- A real research result requires an agreed paper, dataset, encoder, multi-seed evaluation, and sourced hardware assumptions.
