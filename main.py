@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from time import perf_counter
 
 from hdc.core import DEFAULT_DIMENSIONS, OPERATIONS, HDC
 from hdc.model import HDCClassifier
@@ -87,6 +88,9 @@ def print_result(result: dict[str, object]) -> None:
         f"{simulation['total_energy_pj']:.3f} pJ, "
         f"{simulation['total_latency_ns']:.3f} ns"
     )
+    timing = result["timing_ms"]
+    print(f"training time:  {timing['training']:.3f} ms")
+    print(f"inference time: {timing['inference']:.3f} ms")
 
 
 def main() -> int:
@@ -104,8 +108,13 @@ def main() -> int:
     )
 
     classifier = HDCClassifier(hdc)
+    training_started = perf_counter()
     classifier.train(TRAINING_RECORDS)
+    training_ms = (perf_counter() - training_started) * 1_000
+
+    inference_started = perf_counter()
     evaluation = classifier.evaluate(TEST_RECORDS)
+    inference_ms = (perf_counter() - inference_started) * 1_000
 
     result = {
         "experiment": "generic_categorical_baseline",
@@ -114,6 +123,11 @@ def main() -> int:
         **evaluation,
         "memory_bytes": classifier.memory_bytes(),
         "simulation": hdc.report(),
+        "timing_ms": {
+            "training": training_ms,
+            "inference": inference_ms,
+            "total": training_ms + inference_ms,
+        },
         # Kept so older saved-report readers can still find these two values.
         "config": {"dimensions": args.dimensions, "seed": args.seed},
     }
