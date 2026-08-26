@@ -19,10 +19,7 @@ class HDCClassifier:
     def __init__(self, hdc: HDC) -> None:
         self.hdc = hdc
 
-        # item_memory remembers the random vector assigned to each word/value.
         self.item_memory: dict[str, np.ndarray] = {}
-
-        # prototypes will hold one learned vector per class.
         self.prototypes: dict[str, np.ndarray] = {}
 
     def vector_for(self, token: str) -> np.ndarray:
@@ -74,6 +71,10 @@ class HDCClassifier:
             margin -= scores[ranked[1]]
 
         return {"label": ranked[0], "scores": scores, "margin": margin}
+
+    def predict_batch(self, records: Sequence[Record]) -> list[dict[str, object]]:
+        """Predict labels for a batch of records."""
+        return [self.predict(r) for r in records]
 
     def evaluate(self, test_records: Sequence[LabeledRecord]) -> dict[str, object]:
         """Predict several labeled examples and calculate accuracy."""
