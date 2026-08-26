@@ -33,6 +33,10 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertEqual(result["dimensions"], 30)
         self.assertEqual(result["total"], 4)
         self.assertIn("operations", result["simulation"])
+        self.assertGreaterEqual(result["timing_ms"]["training"], 0.0)
+        self.assertGreaterEqual(result["timing_ms"]["inference"], 0.0)
+        self.assertGreaterEqual(result["timing_ms"]["total"], 0.0)
+        self.assertIn("training time:", completed.stdout)
 
 
 if __name__ == "__main__":
