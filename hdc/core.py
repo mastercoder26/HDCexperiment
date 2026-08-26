@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 
-# This is only the default. ``main.py --dimensions 30`` replaces it at runtime.
+# Default hypervector dimensionality.
 DEFAULT_DIMENSIONS = 10_000
 
 OPERATIONS = ("random", "bind", "bundle", "permute", "similarity")
@@ -29,7 +29,6 @@ class HDC:
         self.energy_costs = dict(energy_costs or {})
         self.latency_costs = dict(latency_costs or {})
 
-        # These dictionaries are the simulator: they count algorithmic work.
         self.calls = {name: 0 for name in OPERATIONS}
         self.work_units = {name: 0 for name in OPERATIONS}
 
@@ -63,13 +62,20 @@ class HDC:
         self._record("bind", self.dimensions)
         return (left * right).astype(np.int8)
 
-    def bundle(self, *vectors: np.ndarray) -> np.ndarray:
+    def bundle(self, *vectors: np.ndarray, weights: list[float] | None = None) -> np.ndarray:
         """Combine several hypervectors into one majority-vote hypervector."""
         if not vectors:
             raise ValueError("bundle needs at least one vector")
+        if weights is not None and len(weights) != len(vectors):
+            raise ValueError("weights must match the number of vectors")
 
         checked = [self._check_vector(vector) for vector in vectors]
-        totals = np.sum(checked, axis=0)
+        if weights is not None:
+            weighted = [v * w for v, w in zip(checked, weights)]
+            totals = np.sum(weighted, axis=0)
+        else:
+            totals = np.sum(checked, axis=0)
+            
         bundled = np.where(totals >= 0, 1, -1).astype(np.int8)
         self._record("bundle", (len(checked) - 1) * self.dimensions)
         return bundled
@@ -109,6 +115,3 @@ class HDC:
                 details["latency_ns"] for details in operations.values()
             ),
         }
-# refactor: clean up deprecated API calls
-# Updated at Tue Aug 25 22:12:17 CDT 2026
-
