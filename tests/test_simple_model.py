@@ -58,6 +58,20 @@ class SimpleClassifierTests(unittest.TestCase):
         self.assertEqual(result["accuracy"], 1.0)
         self.assertEqual(len(result["predictions"]), 2)
 
+    def test_predict_batch_returns_one_result_per_record(self):
+        self.classifier.train(TRAINING_RECORDS)
+        records = [
+            {"color": "red", "shape": "circle", "size": "small"},
+            {"color": "blue", "shape": "triangle", "size": "large"},
+        ]
+
+        results = self.classifier.predict_batch(records)
+
+        self.assertEqual(
+            [result["label"] for result in results],
+            ["class_a", "class_b"],
+        )
+
     def test_prediction_before_training_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "train"):
             self.classifier.predict({"color": "red"})

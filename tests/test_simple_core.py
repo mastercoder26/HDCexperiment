@@ -55,6 +55,15 @@ class SimpleHDCTests(unittest.TestCase):
 
         np.testing.assert_array_equal(restored, vector)
 
+    def test_weighted_bundle_can_prioritize_one_vector(self):
+        hdc = HDC(dimensions=3, seed=10)
+        preferred = np.array([1, 1, 1], dtype=np.int8)
+        other = np.array([-1, -1, -1], dtype=np.int8)
+
+        combined = hdc.bundle(preferred, other, weights=[2.0, 1.0])
+
+        np.testing.assert_array_equal(combined, preferred)
+
     def test_report_uses_changeable_operation_costs(self):
         hdc = HDC(
             dimensions=10,
