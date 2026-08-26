@@ -67,6 +67,30 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertIn("average_accuracy", result["summary"])
         self.assertIn("sweep runs: 4", completed.stdout)
 
+    def test_command_line_uses_named_cost_profile(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            output = Path(temporary_directory) / "costs.json"
+            subprocess.run(
+                [
+                    sys.executable,
+                    "main.py",
+                    "--dimensions",
+                    "100",
+                    "--cost-profile",
+                    "example_edge",
+                    "--output",
+                    str(output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            result = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["config"]["cost_profile"], "example_edge")
+        self.assertGreater(result["simulation"]["total_energy_pj"], 0.0)
+        self.assertGreater(result["simulation"]["total_latency_ns"], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
