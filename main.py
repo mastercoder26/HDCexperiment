@@ -29,6 +29,17 @@ TEST_RECORDS = [
 ]
 
 
+def comma_separated_integers(value: str) -> list[int]:
+    """Convert a command-line value such as ``1000,5000`` into integers."""
+    try:
+        numbers = [int(part.strip()) for part in value.split(",") if part.strip()]
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("expected comma-separated integers") from error
+    if not numbers:
+        raise argparse.ArgumentTypeError("expected at least one integer")
+    return numbers
+
+
 def read_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a generic HDC example.")
     parser.add_argument(
@@ -38,6 +49,16 @@ def read_arguments() -> argparse.Namespace:
         help=f"hypervector length (default: {DEFAULT_DIMENSIONS})",
     )
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--sweep-dimensions",
+        type=comma_separated_integers,
+        help="comma-separated dimensions for an experiment sweep",
+    )
+    parser.add_argument(
+        "--sweep-seeds",
+        type=comma_separated_integers,
+        help="comma-separated seeds for an experiment sweep",
+    )
     parser.add_argument(
         "--energy-cost",
         type=float,
@@ -93,16 +114,20 @@ def print_result(result: dict[str, object]) -> None:
     print(f"inference time: {timing['inference']:.3f} ms")
 
 
-def main() -> int:
-    args = read_arguments()
-
+def run_experiment(
+    dimensions: int,
+    seed: int,
+    energy_cost: float = 0.0,
+    latency_cost: float = 0.0,
+) -> dict[str, object]:
+    """Train and evaluate one fully isolated HDC configuration."""
     # The CLI uses one simple cost for every operation. Python users can pass
     # different values per operation directly to HDC if an experiment needs it.
-    energy_costs = {name: args.energy_cost for name in OPERATIONS}
-    latency_costs = {name: args.latency_cost for name in OPERATIONS}
+    energy_costs = {name: energy_cost for name in OPERATIONS}
+    latency_costs = {name: latency_cost for name in OPERATIONS}
     hdc = HDC(
-        dimensions=args.dimensions,
-        seed=args.seed,
+        dimensions=dimensions,
+        seed=seed,
         energy_costs=energy_costs,
         latency_costs=latency_costs,
     )
@@ -118,8 +143,8 @@ def main() -> int:
 
     result = {
         "experiment": "generic_categorical_baseline",
-        "dimensions": args.dimensions,
-        "seed": args.seed,
+        "dimensions": dimensions,
+        "seed": seed,
         **evaluation,
         "memory_bytes": classifier.memory_bytes(),
         "simulation": hdc.report(),
@@ -129,14 +154,58 @@ def main() -> int:
             "total": training_ms + inference_ms,
         },
         # Kept so older saved-report readers can still find these two values.
-        "config": {"dimensions": args.dimensions, "seed": args.seed},
+        "config": {"dimensions": dimensions, "seed": seed},
     }
+    return result
+
+
+def run_sweep(args: argparse.Namespace) -> dict[str, object]:
+    """Run every requested dimension and seed combination."""
+    dimensions = args.sweep_dimensions or [args.dimensions]
+    seeds = args.sweep_seeds or [args.seed]
+    runs = [
+        run_experiment(
+            dimension,
+            seed,
+            energy_cost=args.energy_cost,
+            latency_cost=args.latency_cost,
+        )
+        for dimension in dimensions
+        for seed in seeds
+    ]
+    return {
+        "mode": "sweep",
+        "runs": runs,
+        "summary": {
+            "run_count": len(runs),
+            "average_accuracy": sum(run["accuracy"] for run in runs) / len(runs),
+        },
+    }
+
+
+def main() -> int:
+    args = read_arguments()
+    is_sweep = args.sweep_dimensions is not None or args.sweep_seeds is not None
+    if is_sweep:
+        result = run_sweep(args)
+    else:
+        result = run_experiment(
+            args.dimensions,
+            args.seed,
+            energy_cost=args.energy_cost,
+            latency_cost=args.latency_cost,
+        )
 
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
-    print_result(result)
+    if is_sweep:
+        print("Generic HDC experiment sweep")
+        print(f"sweep runs: {result['summary']['run_count']}")
+        print(f"average accuracy: {result['summary']['average_accuracy']:.1%}")
+    else:
+        print_result(result)
     return 0
 
 
