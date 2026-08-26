@@ -1,9 +1,6 @@
 # Generic HDC Baseline
 
-A small Hyperdimensional Computing baseline for learning from categorical data.
-It demonstrates the standard HDC operations without being tied to a particular
-application or hardware device.
-
+A Hyperdimensional Computing (HDC) baseline for learning from categorical data.
 ## Run
 
 ~~~bash
@@ -22,8 +19,7 @@ python3 -m venv .venv
 - counting operation calls and vector work;
 - optional analytical energy and latency estimates.
 
-The included `class_a` and `class_b` records are intentionally generic. They are
-only a working demonstration of the HDC pipeline, not a real research dataset.
+The `class_a` and `class_b` records are a generic demonstration of the HDC pipeline.
 
 ## Files
 
@@ -53,12 +49,6 @@ Edit `TRAINING_RECORDS` and `TEST_RECORDS` near the top of `main.py` to try
 different labels, fields, and categorical values. Python experiments can also
 pass different energy or latency values for each operation directly to `HDC`.
 
-## Meeting summary
-
-This is an algorithm-level HDC simulator, not a cycle-accurate hardware
-simulator. It provides a working, customizable baseline. The next research step
-is to select a paper or dataset, reproduce its baseline, and then compare one
-controlled change at a time.
 
 ## Tests
 
