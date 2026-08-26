@@ -8,6 +8,7 @@ from pathlib import Path
 from time import perf_counter
 
 from hdc.core import DEFAULT_DIMENSIONS, OPERATIONS, HDC
+from hdc.costs import available_cost_profiles, get_cost_profile
 from hdc.data import load_dataset
 from hdc.model import HDCClassifier
 
@@ -61,16 +62,20 @@ def read_arguments() -> argparse.Namespace:
         help="comma-separated seeds for an experiment sweep",
     )
     parser.add_argument(
+        "--cost-profile",
+        choices=available_cost_profiles(),
+        default="unconfigured",
+        help="named operation-specific analytical cost assumptions",
+    )
+    parser.add_argument(
         "--energy-cost",
         type=float,
-        default=0.0,
-        help="estimated picojoules per work unit",
+        help="uniform picojoules per work unit; overrides the named profile",
     )
     parser.add_argument(
         "--latency-cost",
         type=float,
-        default=0.0,
-        help="estimated nanoseconds per work unit",
+        help="uniform nanoseconds per work unit; overrides the named profile",
     )
     parser.add_argument(
         "--dataset",
@@ -125,14 +130,18 @@ def run_experiment(
     seed: int,
     training_records,
     test_records,
-    energy_cost: float = 0.0,
-    latency_cost: float = 0.0,
+    cost_profile_name: str = "unconfigured",
+    energy_cost: float | None = None,
+    latency_cost: float | None = None,
 ) -> dict[str, object]:
     """Train and evaluate one fully isolated HDC configuration."""
-    # The CLI uses one simple cost for every operation. Python users can pass
-    # different values per operation directly to HDC if an experiment needs it.
-    energy_costs = {name: energy_cost for name in OPERATIONS}
-    latency_costs = {name: latency_cost for name in OPERATIONS}
+    profile = get_cost_profile(cost_profile_name)
+    energy_costs = profile.energy_pj
+    latency_costs = profile.latency_ns
+    if energy_cost is not None:
+        energy_costs = {name: energy_cost for name in OPERATIONS}
+    if latency_cost is not None:
+        latency_costs = {name: latency_cost for name in OPERATIONS}
     hdc = HDC(
         dimensions=dimensions,
         seed=seed,
@@ -162,7 +171,12 @@ def run_experiment(
             "total": training_ms + inference_ms,
         },
         # Kept so older saved-report readers can still find these two values.
-        "config": {"dimensions": dimensions, "seed": seed},
+        "config": {
+            "dimensions": dimensions,
+            "seed": seed,
+            "cost_profile": profile.name,
+            "cost_profile_description": profile.description,
+        },
     }
     return result
 
@@ -181,6 +195,7 @@ def run_sweep(
             seed,
             training_records,
             test_records,
+            cost_profile_name=args.cost_profile,
             energy_cost=args.energy_cost,
             latency_cost=args.latency_cost,
         )
@@ -213,6 +228,7 @@ def main() -> int:
             args.seed,
             training_records,
             test_records,
+            cost_profile_name=args.cost_profile,
             energy_cost=args.energy_cost,
             latency_cost=args.latency_cost,
         )
