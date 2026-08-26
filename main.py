@@ -13,7 +13,6 @@ from hdc.data import load_dataset
 from hdc.model import HDCClassifier
 
 
-# Replace these records and labels to try a different categorical problem.
 TRAINING_RECORDS = [
     ("class_a", {"color": "red", "shape": "circle", "size": "small"}),
     ("class_a", {"color": "orange", "shape": "circle", "size": "small"}),
@@ -32,7 +31,7 @@ TEST_RECORDS = [
 
 
 def comma_separated_integers(value: str) -> list[int]:
-    """Convert a command-line value such as ``1000,5000`` into integers."""
+    """Convert a comma-separated string into a list of integers."""
     try:
         numbers = [int(part.strip()) for part in value.split(",") if part.strip()]
     except ValueError as error:
@@ -43,7 +42,7 @@ def comma_separated_integers(value: str) -> list[int]:
 
 
 def read_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run a generic HDC example.")
+    parser = argparse.ArgumentParser(description="HDC baseline classifier.")
     parser.add_argument(
         "--dimensions",
         type=int,
@@ -170,7 +169,6 @@ def run_experiment(
             "inference": inference_ms,
             "total": training_ms + inference_ms,
         },
-        # Kept so older saved-report readers can still find these two values.
         "config": {
             "dimensions": dimensions,
             "seed": seed,
