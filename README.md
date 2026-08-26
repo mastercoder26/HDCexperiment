@@ -1,6 +1,9 @@
 # Generic HDC Baseline
 
-A Hyperdimensional Computing (HDC) baseline for learning from categorical data.
+A compact Hyperdimensional Computing (HDC) research baseline for categorical
+data. It supports single runs, experiment sweeps, JSON datasets, timing, and
+analytical operation-cost profiles without hardware-specific assumptions.
+
 ## Run
 
 ~~~bash
@@ -17,7 +20,9 @@ python3 -m venv .venv
 - bundling training examples into one prototype per class;
 - choosing the most similar prototype for prediction;
 - counting operation calls and vector work;
-- optional analytical energy and latency estimates.
+- measured training and inference time;
+- optional operation-specific energy and latency estimates;
+- dimension and seed sweeps for repeatable comparisons.
 
 The `class_a` and `class_b` records are a generic demonstration of the HDC pipeline.
 
@@ -26,6 +31,8 @@ The `class_a` and `class_b` records are a generic demonstration of the HDC pipel
 ~~~text
 main.py       example data, settings, training, evaluation, and output
 hdc/core.py   HDC operations and simulator counters
+hdc/costs.py  named analytical cost profiles
+hdc/data.py   validated JSON dataset loading
 hdc/model.py  categorical encoding, prototypes, and prediction
 tests/        automated checks
 ~~~
@@ -38,18 +45,33 @@ Change dimensions or the repeatable random seed:
 .venv/bin/python main.py --dimensions 5000 --seed 7
 ~~~
 
-Add placeholder analytical costs:
+Run four configurations and save their reports:
 
 ~~~bash
-.venv/bin/python main.py --dimensions 5000 \
-    --energy-cost 0.1 --latency-cost 0.2
+.venv/bin/python main.py \
+    --sweep-dimensions 1000,5000 \
+    --sweep-seeds 7,42 \
+    --output sweep.json
 ~~~
 
-Edit `TRAINING_RECORDS` and `TEST_RECORDS` near the top of `main.py` to try
-different labels, fields, and categorical values. Python experiments can also
-pass different energy or latency values for each operation directly to `HDC`.
+Use the illustrative operation-specific cost profile:
 
+~~~bash
+.venv/bin/python main.py --cost-profile example_edge
+~~~
 
+`example_edge` is a demonstration profile, not a hardware measurement. Uniform
+cost overrides remain available through `--energy-cost` and `--latency-cost`.
+
+Load another categorical dataset:
+
+~~~bash
+.venv/bin/python main.py --dataset dataset.json --output result.json
+~~~
+
+The JSON file contains `training` and `test` lists. Each item has a string
+`label` and a non-empty `features` object. Without `--dataset`, the example
+records near the top of `main.py` are used.
 ## Tests
 
 ~~~bash

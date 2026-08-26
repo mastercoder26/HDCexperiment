@@ -74,7 +74,7 @@ class HDCClassifier:
 
     def predict_batch(self, records: Sequence[Record]) -> list[dict[str, object]]:
         """Predict labels for a batch of records."""
-        return [self.predict(r) for r in records]
+        return [self.predict(record) for record in records]
 
     def evaluate(self, test_records: Sequence[LabeledRecord]) -> dict[str, object]:
         """Predict several labeled examples and calculate accuracy."""
