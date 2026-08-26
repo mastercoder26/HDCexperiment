@@ -8,6 +8,7 @@ from pathlib import Path
 from time import perf_counter
 
 from hdc.core import DEFAULT_DIMENSIONS, OPERATIONS, HDC
+from hdc.data import load_dataset
 from hdc.model import HDCClassifier
 
 
@@ -71,6 +72,11 @@ def read_arguments() -> argparse.Namespace:
         default=0.0,
         help="estimated nanoseconds per work unit",
     )
+    parser.add_argument(
+        "--dataset",
+        type=Path,
+        help="optional JSON file containing training and test records",
+    )
     parser.add_argument("--output", type=Path, help="optional JSON output path")
     return parser.parse_args()
 
@@ -117,6 +123,8 @@ def print_result(result: dict[str, object]) -> None:
 def run_experiment(
     dimensions: int,
     seed: int,
+    training_records,
+    test_records,
     energy_cost: float = 0.0,
     latency_cost: float = 0.0,
 ) -> dict[str, object]:
@@ -134,11 +142,11 @@ def run_experiment(
 
     classifier = HDCClassifier(hdc)
     training_started = perf_counter()
-    classifier.train(TRAINING_RECORDS)
+    classifier.train(training_records)
     training_ms = (perf_counter() - training_started) * 1_000
 
     inference_started = perf_counter()
-    evaluation = classifier.evaluate(TEST_RECORDS)
+    evaluation = classifier.evaluate(test_records)
     inference_ms = (perf_counter() - inference_started) * 1_000
 
     result = {
@@ -159,7 +167,11 @@ def run_experiment(
     return result
 
 
-def run_sweep(args: argparse.Namespace) -> dict[str, object]:
+def run_sweep(
+    args: argparse.Namespace,
+    training_records,
+    test_records,
+) -> dict[str, object]:
     """Run every requested dimension and seed combination."""
     dimensions = args.sweep_dimensions or [args.dimensions]
     seeds = args.sweep_seeds or [args.seed]
@@ -167,6 +179,8 @@ def run_sweep(args: argparse.Namespace) -> dict[str, object]:
         run_experiment(
             dimension,
             seed,
+            training_records,
+            test_records,
             energy_cost=args.energy_cost,
             latency_cost=args.latency_cost,
         )
@@ -185,13 +199,20 @@ def run_sweep(args: argparse.Namespace) -> dict[str, object]:
 
 def main() -> int:
     args = read_arguments()
+    if args.dataset:
+        training_records, test_records = load_dataset(args.dataset)
+    else:
+        training_records, test_records = TRAINING_RECORDS, TEST_RECORDS
+
     is_sweep = args.sweep_dimensions is not None or args.sweep_seeds is not None
     if is_sweep:
-        result = run_sweep(args)
+        result = run_sweep(args, training_records, test_records)
     else:
         result = run_experiment(
             args.dimensions,
             args.seed,
+            training_records,
+            test_records,
             energy_cost=args.energy_cost,
             latency_cost=args.latency_cost,
         )
@@ -213,4 +234,3 @@ if __name__ == "__main__":
     raise SystemExit(main())
 # refactor: simplify configuration management logic
 # Updated at Tue Aug 25 22:12:17 CDT 2026
-
