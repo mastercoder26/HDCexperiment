@@ -211,3 +211,6 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+# refactor: simplify configuration management logic
+# Updated at Tue Aug 25 22:12:17 CDT 2026
+
