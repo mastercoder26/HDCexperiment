@@ -80,11 +80,20 @@ class HDCClassifier:
         """Predict several labeled examples and calculate accuracy."""
         predictions = []
         correct = 0
+        margin_total = 0.0
+        class_totals: dict[str, dict[str, int]] = {}
 
         for true_label, record in test_records:
             result = self.predict(record)
             is_correct = result["label"] == true_label
             correct += int(is_correct)
+            margin_total += float(result["margin"])
+            class_stats = class_totals.setdefault(
+                true_label,
+                {"correct": 0, "total": 0},
+            )
+            class_stats["correct"] += int(is_correct)
+            class_stats["total"] += 1
             predictions.append(
                 {
                     "true_label": true_label,
@@ -96,10 +105,23 @@ class HDCClassifier:
             )
 
         total = len(test_records)
+        per_class = {
+            label: {
+                "correct": class_totals[label]["correct"],
+                "total": class_totals[label]["total"],
+                "accuracy": (
+                    class_totals[label]["correct"]
+                    / class_totals[label]["total"]
+                ),
+            }
+            for label in sorted(class_totals)
+        }
         return {
             "correct": correct,
             "total": total,
             "accuracy": correct / total if total else 0.0,
+            "average_margin": margin_total / total if total else 0.0,
+            "per_class": per_class,
             "predictions": predictions,
         }
 
