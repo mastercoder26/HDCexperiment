@@ -77,7 +77,9 @@ records near the top of `main.py` are used.
 ## Tests
 
 ~~~bash
-.venv/bin/python -m unittest discover -v
-.venv/bin/coverage run --branch --source=hdc -m unittest discover
-.venv/bin/coverage report -m
+.venv/bin/python -m pytest -v
+.venv/bin/python -m pytest --cov=hdc --cov-report=term-missing
 ~~~
+
+The coverage configuration requires at least 90% branch-aware coverage. The
+tests remain compatible with Python's built-in `unittest` runner as well.
