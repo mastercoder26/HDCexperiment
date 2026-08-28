@@ -22,6 +22,16 @@ def _read_records(payload: object, section: str) -> list[LabeledRecord]:
             raise ValueError(f"{section} record {index} needs a label")
         if not isinstance(features, dict) or not features:
             raise ValueError(f"{section} record {index} needs features")
+        for field, value in features.items():
+            if not isinstance(field, str) or not field:
+                raise ValueError(
+                    f"{section} record {index} feature names must be strings"
+                )
+            if value is None or not isinstance(value, (str, int, float, bool)):
+                raise ValueError(
+                    f"{section} record {index} feature '{field}' "
+                    "must be a categorical scalar"
+                )
         records.append((label, features))
     return records
 

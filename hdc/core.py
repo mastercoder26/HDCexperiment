@@ -21,7 +21,7 @@ class HDC:
         energy_costs: dict[str, float] | None = None,
         latency_costs: dict[str, float] | None = None,
     ) -> None:
-        if not isinstance(dimensions, int) or dimensions <= 0:
+        if type(dimensions) is not int or dimensions <= 0:
             raise ValueError("dimensions must be a positive integer")
 
         self.dimensions = dimensions
@@ -72,12 +72,23 @@ class HDC:
             raise ValueError("bundle needs at least one vector")
         if weights is not None and len(weights) != len(vectors):
             raise ValueError("weights must match the number of vectors")
+        if weights is not None:
+            try:
+                checked_weights = np.asarray(weights, dtype=float)
+            except (TypeError, ValueError) as error:
+                raise ValueError("weights must be numeric") from error
+            if not np.all(np.isfinite(checked_weights)):
+                raise ValueError("weights must be finite")
+            if np.any(checked_weights < 0):
+                raise ValueError("weights must be non-negative")
+            if not np.any(checked_weights > 0):
+                raise ValueError("at least one weight must be positive")
 
         checked = [self._check_vector(vector) for vector in vectors]
         if weights is not None:
             weighted = [
                 vector * weight
-                for vector, weight in zip(checked, weights)
+                for vector, weight in zip(checked, checked_weights)
             ]
             totals = np.sum(weighted, axis=0)
         else:
