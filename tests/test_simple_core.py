@@ -85,6 +85,8 @@ class SimpleHDCTests(unittest.TestCase):
     def test_bad_dimensions_and_vectors_are_rejected(self):
         with self.assertRaisesRegex(ValueError, "dimensions"):
             HDC(dimensions=0)
+        with self.assertRaisesRegex(ValueError, "dimensions"):
+            HDC(dimensions=True)
 
         hdc = HDC(dimensions=3)
         with self.assertRaisesRegex(ValueError, "bipolar"):
@@ -92,6 +94,20 @@ class SimpleHDCTests(unittest.TestCase):
                 np.array([1, 0, -1]),
                 np.array([1, 1, -1]),
             )
+
+    def test_bundle_rejects_invalid_weights(self):
+        hdc = HDC(dimensions=3, seed=12)
+        first = np.array([1, 1, -1], dtype=np.int8)
+        second = np.array([-1, 1, 1], dtype=np.int8)
+
+        with self.assertRaisesRegex(ValueError, "weights"):
+            hdc.bundle(first, second, weights=[1.0])
+        with self.assertRaisesRegex(ValueError, "finite"):
+            hdc.bundle(first, second, weights=[1.0, np.nan])
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            hdc.bundle(first, second, weights=[1.0, -1.0])
+        with self.assertRaisesRegex(ValueError, "positive"):
+            hdc.bundle(first, second, weights=[0.0, 0.0])
 
 
 if __name__ == "__main__":

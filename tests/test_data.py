@@ -49,6 +49,24 @@ class DatasetTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "features"):
             load_dataset(path)
 
+    def test_rejects_non_categorical_feature_values(self):
+        path = self.write_dataset(
+            {
+                "training": [
+                    {
+                        "label": "left",
+                        "features": {"color": {"nested": "red"}},
+                    }
+                ],
+                "test": [
+                    {"label": "left", "features": {"color": "red"}},
+                ],
+            }
+        )
+
+        with self.assertRaisesRegex(ValueError, "categorical scalar"):
+            load_dataset(path)
+
 
 if __name__ == "__main__":
     unittest.main()

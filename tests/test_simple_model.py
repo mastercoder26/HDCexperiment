@@ -93,6 +93,10 @@ class SimpleClassifierTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "train"):
             self.classifier.predict({"color": "red"})
 
+    def test_training_rejects_empty_label(self):
+        with self.assertRaisesRegex(ValueError, "label"):
+            self.classifier.train([("", {"color": "red"})])
+
     def test_memory_size_counts_items_and_prototypes(self):
         self.classifier.train(TRAINING_RECORDS)
 
