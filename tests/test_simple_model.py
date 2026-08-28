@@ -57,6 +57,23 @@ class SimpleClassifierTests(unittest.TestCase):
         self.assertEqual(result["total"], 2)
         self.assertEqual(result["accuracy"], 1.0)
         self.assertEqual(len(result["predictions"]), 2)
+        self.assertGreater(result["average_margin"], 0.0)
+        self.assertEqual(
+            result["per_class"],
+            {
+                "class_a": {"correct": 1, "total": 1, "accuracy": 1.0},
+                "class_b": {"correct": 1, "total": 1, "accuracy": 1.0},
+            },
+        )
+
+    def test_evaluate_empty_test_set_returns_empty_metrics(self):
+        self.classifier.train(TRAINING_RECORDS)
+
+        result = self.classifier.evaluate([])
+
+        self.assertEqual(result["accuracy"], 0.0)
+        self.assertEqual(result["average_margin"], 0.0)
+        self.assertEqual(result["per_class"], {})
 
     def test_predict_batch_returns_one_result_per_record(self):
         self.classifier.train(TRAINING_RECORDS)
