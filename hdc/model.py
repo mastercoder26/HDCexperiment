@@ -48,6 +48,8 @@ class HDCClassifier:
 
         examples_by_label: dict[str, list[np.ndarray]] = {}
         for label, record in training_records:
+            if not isinstance(label, str) or not label:
+                raise ValueError("training labels must be non-empty strings")
             examples_by_label.setdefault(label, []).append(self.encode(record))
 
         self.prototypes = {
