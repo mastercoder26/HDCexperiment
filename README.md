@@ -21,6 +21,8 @@ python3 -m venv .venv
 - choosing the most similar prototype for prediction;
 - counting operation calls and vector work;
 - measured training and inference time;
+- overall accuracy, per-class accuracy, and average prediction margin;
+- dataset size, class names, model-vector counts, and memory usage;
 - optional operation-specific energy and latency estimates;
 - dimension and seed sweeps for repeatable comparisons.
 

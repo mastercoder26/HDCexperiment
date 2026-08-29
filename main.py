@@ -93,6 +93,13 @@ def print_result(result: dict[str, object]) -> None:
         f"accuracy:   {result['correct']}/{result['total']} "
         f"({result['accuracy']:.1%})"
     )
+    print(f"average margin: {result['average_margin']:.3f}")
+    print("per-class accuracy:")
+    for label, stats in result["per_class"].items():
+        print(
+            f"  {label}: {stats['correct']}/{stats['total']} "
+            f"({stats['accuracy']:.1%})"
+        )
 
     print("\npredictions:")
     for prediction in result["predictions"]:
@@ -156,13 +163,28 @@ def run_experiment(
     inference_started = perf_counter()
     evaluation = classifier.evaluate(test_records)
     inference_ms = (perf_counter() - inference_started) * 1_000
+    memory_bytes = classifier.memory_bytes()
+    labels = sorted(
+        {label for label, _ in training_records}
+        | {label for label, _ in test_records}
+    )
 
     result = {
         "experiment": "generic_categorical_baseline",
         "dimensions": dimensions,
         "seed": seed,
         **evaluation,
-        "memory_bytes": classifier.memory_bytes(),
+        "memory_bytes": memory_bytes,
+        "dataset": {
+            "training_records": len(training_records),
+            "test_records": len(test_records),
+            "classes": labels,
+        },
+        "model": {
+            "item_vectors": len(classifier.item_memory),
+            "prototype_vectors": len(classifier.prototypes),
+            "memory_bytes": memory_bytes,
+        },
         "simulation": hdc.report(),
         "timing_ms": {
             "training": training_ms,
@@ -206,6 +228,9 @@ def run_sweep(
         "summary": {
             "run_count": len(runs),
             "average_accuracy": sum(run["accuracy"] for run in runs) / len(runs),
+            "average_margin": (
+                sum(run["average_margin"] for run in runs) / len(runs)
+            ),
         },
     }
 
