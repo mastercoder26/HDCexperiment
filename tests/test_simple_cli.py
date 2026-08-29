@@ -37,6 +37,13 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertGreaterEqual(result["timing_ms"]["inference"], 0.0)
         self.assertGreaterEqual(result["timing_ms"]["total"], 0.0)
         self.assertIn("training time:", completed.stdout)
+        self.assertIn("average margin:", completed.stdout)
+        self.assertEqual(result["dataset"]["training_records"], 6)
+        self.assertEqual(result["dataset"]["test_records"], 4)
+        self.assertEqual(result["dataset"]["classes"], ["class_a", "class_b"])
+        self.assertGreater(result["model"]["item_vectors"], 0)
+        self.assertEqual(result["model"]["prototype_vectors"], 2)
+        self.assertEqual(result["model"]["memory_bytes"], result["memory_bytes"])
 
     def test_command_line_runs_dimension_and_seed_sweep(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
