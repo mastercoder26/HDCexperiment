@@ -21,9 +21,9 @@ jobs:
             package: hdc-baseline-windows-x64
           - os: ubuntu-22.04
             package: hdc-baseline-linux-x64
-          - os: macos-15
+          - os: macos-15-intel
             package: hdc-baseline-macos-x64
-          - os: macos-15-arm64
+          - os: macos-15
             package: hdc-baseline-macos-arm64
 
     steps:
