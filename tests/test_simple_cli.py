@@ -74,6 +74,34 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertIn("average_accuracy", result["summary"])
         self.assertIn("sweep runs: 4", completed.stdout)
 
+    def test_command_line_demo_explains_the_built_in_example(self):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "main.py",
+                "--demo",
+                "--dimensions",
+                "64",
+                "--seed",
+                "42",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn("HDC demo", completed.stdout)
+        self.assertIn("1. Encode each record as a hypervector.", completed.stdout)
+        self.assertIn(
+            "2. Bundle the training records into class prototypes.", completed.stdout
+        )
+        self.assertIn(
+            "3. Compare each test record with those prototypes.", completed.stdout
+        )
+        self.assertIn("training records: 6", completed.stdout)
+        self.assertIn("test records:     4", completed.stdout)
+        self.assertIn("accuracy:   4/4", completed.stdout)
+
     def test_command_line_uses_named_cost_profile(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             output = Path(temporary_directory) / "costs.json"
