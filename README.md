@@ -4,7 +4,33 @@ A compact Hyperdimensional Computing (HDC) research baseline for categorical
 data. It supports single runs, experiment sweeps, JSON datasets, timing, and
 analytical operation-cost profiles without hardware-specific assumptions.
 
-## Run
+## Download a compiled binary
+
+The [latest GitHub Release](https://github.com/mastercoder26/HDCexperiment/releases/latest)
+contains standalone builds that do not need Python or NumPy installed.
+
+| Download | Runs on |
+| --- | --- |
+| `hdc-baseline-windows-x64.zip` | 64-bit Windows |
+| `hdc-baseline-macos-arm64.zip` | Apple Silicon macOS |
+| `hdc-baseline-macos-x64.zip` | Intel macOS |
+| `hdc-baseline-linux-x64.zip` | 64-bit Linux |
+
+Unzip the matching download, open a terminal in that folder, and run it:
+
+~~~text
+Windows:  .\hdc-baseline.exe --dimensions 10000 --seed 42
+macOS:    ./hdc-baseline --dimensions 10000 --seed 42
+Linux:    ./hdc-baseline --dimensions 10000 --seed 42
+~~~
+
+The macOS binaries are not code-signed. If Gatekeeper quarantines the download,
+run `xattr -d com.apple.quarantine hdc-baseline` once. On Linux, run
+`chmod +x hdc-baseline` if the executable bit was lost while unzipping. On
+Windows, choose **More info → Run anyway** if SmartScreen warns about the
+unsigned executable.
+
+## Run from source
 
 ~~~bash
 python3 -m venv .venv
@@ -83,3 +109,18 @@ records near the top of `main.py` are used.
 
 The coverage configuration requires at least 90% branch-aware coverage. The
 tests remain compatible with Python's built-in `unittest` runner as well.
+
+## Build a binary locally
+
+Install the build requirements, then run PyInstaller on the operating system
+you are targeting:
+
+~~~bash
+.venv/bin/python -m pip install -r requirements-build.txt
+.venv/bin/python -m PyInstaller --clean --noconfirm --onefile --name hdc-baseline main.py
+~~~
+
+The executable is written to `dist/`. PyInstaller does not cross-compile, so
+`.github/workflows/build-binaries.yml` repeats the build and smoke test on each
+supported operating system. Pushing a tag such as `v1.0.0` publishes all four
+ZIP files in a GitHub Release.
