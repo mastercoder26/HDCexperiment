@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from time import perf_counter
 
@@ -42,6 +43,12 @@ def comma_separated_integers(value: str) -> list[int]:
 
 def read_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="HDC baseline classifier.")
+    input_source = parser.add_mutually_exclusive_group()
+    input_source.add_argument(
+        "--demo",
+        action="store_true",
+        help="explain and run the built-in HDC example",
+    )
     parser.add_argument(
         "--dimensions",
         type=int,
@@ -75,13 +82,25 @@ def read_arguments() -> argparse.Namespace:
         type=float,
         help="uniform nanoseconds per work unit; overrides the named profile",
     )
-    parser.add_argument(
+    input_source.add_argument(
         "--dataset",
         type=Path,
         help="optional JSON file containing training and test records",
     )
     parser.add_argument("--output", type=Path, help="optional JSON output path")
     return parser.parse_args()
+
+
+def print_demo_intro(
+    training_records: Sequence[LabeledRecord],
+    test_records: Sequence[LabeledRecord],
+) -> None:
+    print("HDC demo")
+    print("1. Encode each record as a hypervector.")
+    print("2. Bundle the training records into class prototypes.")
+    print("3. Compare each test record with those prototypes.")
+    print(f"training records: {len(training_records)}")
+    print(f"test records:     {len(test_records)}\n")
 
 
 def print_result(result: dict[str, object]) -> None:
@@ -239,6 +258,9 @@ def main() -> int:
         training_records, test_records = load_dataset(args.dataset)
     else:
         training_records, test_records = TRAINING_RECORDS, TEST_RECORDS
+
+    if args.demo:
+        print_demo_intro(training_records, test_records)
 
     is_sweep = args.sweep_dimensions is not None or args.sweep_seeds is not None
     if is_sweep:
