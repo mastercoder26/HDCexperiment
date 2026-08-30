@@ -1,4 +1,4 @@
-"""Load labeled categorical records from a small JSON dataset."""
+"""Load labeled categorical records from JSON."""
 
 from __future__ import annotations
 
@@ -14,22 +14,21 @@ def _read_records(payload: object, section: str) -> list[LabeledRecord]:
 
     records: list[LabeledRecord] = []
     for index, item in enumerate(payload):
+        record_name = f"{section} record {index}"
         if not isinstance(item, dict):
-            raise ValueError(f"{section} record {index} must be an object")
+            raise ValueError(f"{record_name} must be an object")
         label = item.get("label")
         features = item.get("features")
         if not isinstance(label, str) or not label:
-            raise ValueError(f"{section} record {index} needs a label")
+            raise ValueError(f"{record_name} needs a label")
         if not isinstance(features, dict) or not features:
-            raise ValueError(f"{section} record {index} needs features")
+            raise ValueError(f"{record_name} needs features")
         for field, value in features.items():
             if not isinstance(field, str) or not field:
-                raise ValueError(
-                    f"{section} record {index} feature names must be strings"
-                )
+                raise ValueError(f"{record_name} feature names must be strings")
             if value is None or not isinstance(value, (str, int, float, bool)):
                 raise ValueError(
-                    f"{section} record {index} feature '{field}' "
+                    f"{record_name} feature '{field}' "
                     "must be a categorical scalar"
                 )
         records.append((label, features))

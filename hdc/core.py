@@ -1,11 +1,10 @@
-"""The five basic operations used by this beginner HDC project."""
+"""Basic hyperdimensional computing operations."""
 
 from __future__ import annotations
 
 import numpy as np
 
 
-# Default hypervector dimensionality.
 DEFAULT_DIMENSIONS = 10_000
 
 OPERATIONS = ("random", "bind", "bundle", "permute", "similarity")
@@ -33,7 +32,6 @@ class HDC:
         self.work_units = {name: 0 for name in OPERATIONS}
 
     def _check_vector(self, vector: np.ndarray) -> np.ndarray:
-        """Make sure a value is one valid hypervector for this HDC object."""
         checked = np.asarray(vector)
         if checked.ndim != 1 or len(checked) != self.dimensions:
             raise ValueError(
@@ -44,7 +42,6 @@ class HDC:
         return checked
 
     def _record(self, operation: str, work: int) -> None:
-        """Add one operation to the simulator counters."""
         self.calls[operation] += 1
         self.work_units[operation] += work
 
@@ -84,18 +81,18 @@ class HDC:
             if not np.any(checked_weights > 0):
                 raise ValueError("at least one weight must be positive")
 
-        checked = [self._check_vector(vector) for vector in vectors]
+        checked_vectors = [self._check_vector(vector) for vector in vectors]
         if weights is not None:
             weighted = [
                 vector * weight
-                for vector, weight in zip(checked, checked_weights)
+                for vector, weight in zip(checked_vectors, checked_weights)
             ]
             totals = np.sum(weighted, axis=0)
         else:
-            totals = np.sum(checked, axis=0)
+            totals = np.sum(checked_vectors, axis=0)
 
         bundled = np.where(totals >= 0, 1, -1).astype(np.int8)
-        self._record("bundle", (len(checked) - 1) * self.dimensions)
+        self._record("bundle", (len(checked_vectors) - 1) * self.dimensions)
         return bundled
 
     def permute(self, vector: np.ndarray, shifts: int = 1) -> np.ndarray:
@@ -109,7 +106,8 @@ class HDC:
         left = self._check_vector(left)
         right = self._check_vector(right)
         self._record("similarity", self.dimensions)
-        return float(np.dot(left.astype(float), right.astype(float))) / self.dimensions
+        dot_product = np.dot(left.astype(float), right.astype(float))
+        return float(dot_product) / self.dimensions
 
     def report(self) -> dict[str, object]:
         """Return operation counts plus optional energy and latency estimates."""

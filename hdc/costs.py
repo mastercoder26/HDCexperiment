@@ -1,4 +1,4 @@
-"""Named analytical cost assumptions for HDC operations."""
+"""Named energy and latency estimates for HDC operations."""
 
 from __future__ import annotations
 
@@ -53,7 +53,6 @@ _PROFILES = {
 
 
 def available_cost_profiles() -> tuple[str, ...]:
-    """Return cost-profile names accepted by the command line."""
     return tuple(_PROFILES)
 
 

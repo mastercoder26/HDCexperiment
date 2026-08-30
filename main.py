@@ -1,4 +1,4 @@
-"""Run a generic HDC classifier on a small categorical example."""
+"""Run the example HDC classifier."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from time import perf_counter
 from hdc.core import DEFAULT_DIMENSIONS, OPERATIONS, HDC
 from hdc.costs import available_cost_profiles, get_cost_profile
 from hdc.data import load_dataset
-from hdc.model import HDCClassifier
+from hdc.model import HDCClassifier, LabeledRecord
 
 
 TRAINING_RECORDS = [
@@ -31,7 +31,6 @@ TEST_RECORDS = [
 
 
 def comma_separated_integers(value: str) -> list[int]:
-    """Convert a comma-separated string into a list of integers."""
     try:
         numbers = [int(part.strip()) for part in value.split(",") if part.strip()]
     except ValueError as error:
@@ -134,13 +133,13 @@ def print_result(result: dict[str, object]) -> None:
 def run_experiment(
     dimensions: int,
     seed: int,
-    training_records,
-    test_records,
+    training_records: list[LabeledRecord],
+    test_records: list[LabeledRecord],
     cost_profile_name: str = "unconfigured",
     energy_cost: float | None = None,
     latency_cost: float | None = None,
 ) -> dict[str, object]:
-    """Train and evaluate one fully isolated HDC configuration."""
+    """Train and evaluate one HDC configuration."""
     profile = get_cost_profile(cost_profile_name)
     energy_costs = profile.energy_pj
     latency_costs = profile.latency_ns
@@ -169,7 +168,7 @@ def run_experiment(
         | {label for label, _ in test_records}
     )
 
-    result = {
+    return {
         "experiment": "generic_categorical_baseline",
         "dimensions": dimensions,
         "seed": seed,
@@ -198,13 +197,12 @@ def run_experiment(
             "cost_profile_description": profile.description,
         },
     }
-    return result
 
 
 def run_sweep(
     args: argparse.Namespace,
-    training_records,
-    test_records,
+    training_records: list[LabeledRecord],
+    test_records: list[LabeledRecord],
 ) -> dict[str, object]:
     """Run every requested dimension and seed combination."""
     dimensions = args.sweep_dimensions or [args.dimensions]
