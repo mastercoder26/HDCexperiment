@@ -1,0 +1,104 @@
+name: Build binaries
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.package }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            package: hdc-baseline-windows-x64
+          - os: ubuntu-22.04
+            package: hdc-baseline-linux-x64
+          - os: macos-15
+            package: hdc-baseline-macos-x64
+          - os: macos-15-arm64
+            package: hdc-baseline-macos-arm64
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            requirements-build.txt
+
+      - name: Install test and build dependencies
+        run: python -m pip install -r requirements-dev.txt -r requirements-build.txt
+
+      - name: Run tests
+        run: python -m pytest -q
+
+      - name: Build single-file executable
+        run: >-
+          python -m PyInstaller
+          --clean
+          --noconfirm
+          --onefile
+          --name hdc-baseline
+          main.py
+
+      - name: Smoke-test executable (Windows)
+        if: runner.os == 'Windows'
+        run: .\dist\hdc-baseline.exe --dimensions 64 --output smoke-result.json
+
+      - name: Smoke-test executable (Unix)
+        if: runner.os != 'Windows'
+        run: ./dist/hdc-baseline --dimensions 64 --output smoke-result.json
+
+      - name: Check smoke-test result
+        run: >-
+          python -c "import json; result = json.load(open('smoke-result.json', encoding='utf-8')); assert result['dimensions'] == 64"
+
+      - name: Create Windows ZIP
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist/hdc-baseline.exe -DestinationPath ${{ matrix.package }}.zip
+
+      - name: Create Unix ZIP
+        if: runner.os != 'Windows'
+        shell: bash
+        run: cd dist && zip -9 ../${{ matrix.package }}.zip hdc-baseline
+
+      - name: Upload packaged binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package }}
+          path: ${{ matrix.package }}.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download packaged binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Attach binaries to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*.zip
+          generate_release_notes: true
