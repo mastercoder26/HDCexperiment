@@ -1,4 +1,4 @@
-"""A small HDC classifier for generic categorical records."""
+"""An HDC classifier for categorical records."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class HDCClassifier:
         self.prototypes: dict[str, np.ndarray] = {}
 
     def vector_for(self, token: str) -> np.ndarray:
-        """Return the same random vector every time a token is requested."""
+        """Return a stable random vector for a token."""
         if token not in self.item_memory:
             self.item_memory[token] = self.hdc.random_vector()
         return self.item_memory[token].copy()
@@ -67,12 +67,15 @@ class HDCClassifier:
             label: self.hdc.similarity(encoded, prototype)
             for label, prototype in self.prototypes.items()
         }
-        ranked = sorted(scores, key=scores.get, reverse=True)  # type: ignore[arg-type]
-        margin = scores[ranked[0]]
-        if len(ranked) > 1:
-            margin -= scores[ranked[1]]
+        ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+        best_label, best_score = ranked[0]
+        second_score = ranked[1][1] if len(ranked) > 1 else 0.0
 
-        return {"label": ranked[0], "scores": scores, "margin": margin}
+        return {
+            "label": best_label,
+            "scores": scores,
+            "margin": best_score - second_score,
+        }
 
     def predict_batch(self, records: Sequence[Record]) -> list[dict[str, object]]:
         """Predict labels for a batch of records."""
@@ -107,17 +110,13 @@ class HDCClassifier:
             )
 
         total = len(test_records)
-        per_class = {
-            label: {
-                "correct": class_totals[label]["correct"],
-                "total": class_totals[label]["total"],
-                "accuracy": (
-                    class_totals[label]["correct"]
-                    / class_totals[label]["total"]
-                ),
+        per_class = {}
+        for label in sorted(class_totals):
+            stats = class_totals[label]
+            per_class[label] = {
+                **stats,
+                "accuracy": stats["correct"] / stats["total"],
             }
-            for label in sorted(class_totals)
-        }
         return {
             "correct": correct,
             "total": total,
