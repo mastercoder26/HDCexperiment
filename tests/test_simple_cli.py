@@ -91,6 +91,18 @@ class SimpleCommandLineTests(unittest.TestCase):
         )
 
         self.assertIn("HDC demo", completed.stdout)
+        self.assertIn(
+            "Learn to tell class_a and class_b apart using color, shape, and size.",
+            completed.stdout,
+        )
+        self.assertIn("Training examples:", completed.stdout)
+        self.assertIn(
+            "class_a: color=red, shape=circle, size=small", completed.stdout
+        )
+        self.assertIn(
+            "class_b: color=blue, shape=square, size=medium", completed.stdout
+        )
+        self.assertIn("How HDC handles the examples:", completed.stdout)
         self.assertIn("1. Encode each record as a hypervector.", completed.stdout)
         self.assertIn(
             "2. Bundle the training records into class prototypes.", completed.stdout

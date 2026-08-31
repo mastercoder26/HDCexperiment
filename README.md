@@ -18,7 +18,7 @@ macOS or Linux:
 ./hdc-baseline --demo
 ```
 
-The demo trains on six built-in records and tests four more. It prints the predictions, accuracy, similarity margins, operation counts, and run time.
+The demo starts by showing its goal and all six training examples in plain language. It then tests four new records and prints the predictions, accuracy, similarity margins, operation counts, and run time.
 
 If macOS blocks the unsigned file, run:
 

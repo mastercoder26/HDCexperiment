@@ -95,7 +95,27 @@ def print_demo_intro(
     training_records: Sequence[LabeledRecord],
     test_records: Sequence[LabeledRecord],
 ) -> None:
-    print("HDC demo")
+    labels = sorted({label for label, _ in training_records})
+    feature_names = sorted(
+        {feature for _, record in training_records for feature in record}
+    )
+    label_text = " and ".join(labels)
+    if len(feature_names) > 2:
+        feature_text = f"{', '.join(feature_names[:-1])}, and {feature_names[-1]}"
+    else:
+        feature_text = " and ".join(feature_names)
+
+    print("HDC demo\n")
+    print("Goal:")
+    print(f"Learn to tell {label_text} apart using {feature_text}.\n")
+    print("Training examples:")
+    for label, record in training_records:
+        features = ", ".join(
+            f"{name}={record[name]}" for name in feature_names if name in record
+        )
+        print(f"  {label}: {features}")
+
+    print("\nHow HDC handles the examples:")
     print("1. Encode each record as a hypervector.")
     print("2. Bundle the training records into class prototypes.")
     print("3. Compare each test record with those prototypes.")
