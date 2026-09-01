@@ -2,6 +2,10 @@
 
 I built this project to understand how Hyperdimensional Computing can be used for a small classification problem. It turns categorical data into long vectors, learns one prototype for each class, and predicts the closest match.
 
+## Why I built this
+
+I cold-emailed more than 100 professors before hearing back from a professor at Texas State University. He was exploring how hyperdimensional computing could be used on Internet of Things devices, such as sensors in agricultural or medical applications. As part of that work, he asked me to create a baseline simulator. This project is one of the baselines I have been working on.
+
 ## Try the demo
 
 Download the ZIP for your computer from the [latest release](https://github.com/mastercoder26/HDCexperiment/releases/latest), extract it, and open a terminal in that folder. Python is not required.
