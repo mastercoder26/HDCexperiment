@@ -22,7 +22,7 @@ macOS or Linux:
 ./hdc-baseline --demo
 ```
 
-The demo starts by showing its goal, all six training examples, and the four held-out test records in plain language. It then prints the predictions, accuracy, similarity margins, model footprint, operation counts, and run time. Experiment sweeps also highlight the best-performing configuration.
+The demo starts by showing its goal, all six training examples, and the four held-out test records in plain language. It then prints labeled predictions, an accuracy bar, similarity margins, dataset and model details, operation counts, and run time. Experiment sweeps list every run and highlight the best-performing configuration, and saved JSON files are confirmed in the terminal.
 
 If macOS blocks the unsigned file, run:
 
@@ -48,6 +48,9 @@ The included dataset is intentionally small. Its accuracy shows that the pipelin
 ## Other commands
 
 ```bash
+# Show the installed release version
+./hdc-baseline --version
+
 # Change the vector size and random seed
 ./hdc-baseline --dimensions 5000 --seed 7
 

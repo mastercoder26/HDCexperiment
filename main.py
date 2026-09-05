@@ -9,6 +9,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from hdc import __version__
 from hdc.core import DEFAULT_DIMENSIONS, HDC, OPERATIONS
 from hdc.costs import available_cost_profiles, get_cost_profile
 from hdc.data import load_dataset
@@ -47,6 +48,11 @@ def comma_separated_integers(value: str) -> list[int]:
 
 def read_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="HDC baseline classifier.")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"hdc-baseline {__version__}",
+    )
     input_source = parser.add_mutually_exclusive_group()
     input_source.add_argument(
         "--demo",
@@ -139,10 +145,18 @@ def print_result(result: Result) -> None:
     print("Generic HDC baseline")
     print(f"dimensions: {result['dimensions']}")
     print(f"seed:       {result['seed']}")
+    dataset = result["dataset"]
+    print(
+        f"dataset:    {dataset['training_records']} training / "
+        f"{dataset['test_records']} test / {len(dataset['classes'])} classes"
+    )
     print(
         f"accuracy:   {result['correct']}/{result['total']} "
         f"({result['accuracy']:.1%})"
     )
+    filled = round(result["accuracy"] * 20)
+    accuracy_bar = "#" * filled + "-" * (20 - filled)
+    print(f"accuracy bar: [{accuracy_bar}] {result['accuracy']:.1%}")
     print(f"average margin: {result['average_margin']:.3f}")
 
     model = result["model"]
@@ -165,8 +179,9 @@ def print_result(result: Result) -> None:
             f"{label}={score:.3f}"
             for label, score in sorted(prediction["scores"].items())
         )
+        status = "OK" if prediction["correct"] else "MISS"
         print(
-            f"  true={prediction['true_label']:<7} "
+            f"  [{status}] true={prediction['true_label']:<7} "
             f"predicted={prediction['predicted_label']:<7} "
             f"margin={prediction['margin']:.3f} ({scores})"
         )
@@ -335,6 +350,13 @@ def main() -> int:
         print(f"sweep runs: {summary['run_count']}")
         print(f"average accuracy: {summary['average_accuracy']:.1%}")
         print(f"average margin: {summary['average_margin']:.3f}")
+        print("run details:")
+        for run in result["runs"]:
+            print(
+                f"  dimensions={run['dimensions']} seed={run['seed']} "
+                f"accuracy={run['accuracy']:.1%} "
+                f"margin={run['average_margin']:.3f}"
+            )
         print(
             "best run: "
             f"dimensions={best_run['dimensions']}, seed={best_run['seed']}, "
@@ -343,6 +365,9 @@ def main() -> int:
         )
     else:
         print_result(result)
+
+    if args.output:
+        print(f"\nsaved results: {args.output}")
     return 0
 
 

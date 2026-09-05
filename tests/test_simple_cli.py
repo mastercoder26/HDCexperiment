@@ -7,6 +7,16 @@ from pathlib import Path
 
 
 class SimpleCommandLineTests(unittest.TestCase):
+    def test_command_line_reports_package_version(self):
+        completed = subprocess.run(
+            [sys.executable, "main.py", "--version"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(completed.stdout.strip(), "hdc-baseline 1.2.2")
+
     def test_command_line_dimension_reaches_saved_result(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             output = Path(temporary_directory) / "result.json"
@@ -38,6 +48,11 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertGreaterEqual(result["timing_ms"]["total"], 0.0)
         self.assertIn("training time:", completed.stdout)
         self.assertIn("average margin:", completed.stdout)
+        self.assertIn("dataset:    6 training / 4 test / 2 classes", completed.stdout)
+        self.assertIn("accuracy bar: [###############-----] 75.0%", completed.stdout)
+        self.assertIn("[OK]", completed.stdout)
+        self.assertIn("[MISS]", completed.stdout)
+        self.assertIn(f"saved results: {output}", completed.stdout)
         self.assertEqual(result["dataset"]["training_records"], 6)
         self.assertEqual(result["dataset"]["test_records"], 4)
         self.assertEqual(result["dataset"]["classes"], ["class_a", "class_b"])
@@ -84,7 +99,11 @@ class SimpleCommandLineTests(unittest.TestCase):
         )
         self.assertIn("sweep runs: 4", completed.stdout)
         self.assertIn("average margin:", completed.stdout)
+        self.assertIn("run details:", completed.stdout)
+        self.assertIn("dimensions=30 seed=1", completed.stdout)
+        self.assertIn("dimensions=60 seed=2", completed.stdout)
         self.assertIn("best run:", completed.stdout)
+        self.assertIn(f"saved results: {output}", completed.stdout)
 
     def test_command_line_demo_explains_the_built_in_example(self):
         completed = subprocess.run(
