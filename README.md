@@ -22,7 +22,7 @@ macOS or Linux:
 ./hdc-baseline --demo
 ```
 
-The demo starts by showing its goal and all six training examples in plain language. It then tests four new records and prints the predictions, accuracy, similarity margins, operation counts, and run time.
+The demo starts by showing its goal, all six training examples, and the four held-out test records in plain language. It then prints the predictions, accuracy, similarity margins, model footprint, operation counts, and run time. Experiment sweeps also highlight the best-performing configuration.
 
 If macOS blocks the unsigned file, run:
 

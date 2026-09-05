@@ -44,6 +44,10 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertGreater(result["model"]["item_vectors"], 0)
         self.assertEqual(result["model"]["prototype_vectors"], 2)
         self.assertEqual(result["model"]["memory_bytes"], result["memory_bytes"])
+        self.assertIn("model:", completed.stdout)
+        self.assertIn("item vectors:", completed.stdout)
+        self.assertIn("prototypes:", completed.stdout)
+        self.assertIn("memory:", completed.stdout)
 
     def test_command_line_runs_dimension_and_seed_sweep(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -72,7 +76,15 @@ class SimpleCommandLineTests(unittest.TestCase):
             {(30, 1), (30, 2), (60, 1), (60, 2)},
         )
         self.assertIn("average_accuracy", result["summary"])
+        self.assertIn("average_margin", result["summary"])
+        self.assertIn("best_run", result["summary"])
+        self.assertEqual(
+            set(result["summary"]["best_run"]),
+            {"dimensions", "seed", "accuracy", "average_margin"},
+        )
         self.assertIn("sweep runs: 4", completed.stdout)
+        self.assertIn("average margin:", completed.stdout)
+        self.assertIn("best run:", completed.stdout)
 
     def test_command_line_demo_explains_the_built_in_example(self):
         completed = subprocess.run(
@@ -112,6 +124,9 @@ class SimpleCommandLineTests(unittest.TestCase):
         )
         self.assertIn("training records: 6", completed.stdout)
         self.assertIn("test records:     4", completed.stdout)
+        self.assertIn("Test examples (labels hidden during prediction):", completed.stdout)
+        self.assertIn("color=orange, shape=square, size=small", completed.stdout)
+        self.assertIn("color=blue, shape=triangle, size=medium", completed.stdout)
         self.assertIn("accuracy:   4/4", completed.stdout)
 
     def test_command_line_uses_named_cost_profile(self):

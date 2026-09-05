@@ -7,14 +7,18 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 from time import perf_counter
+from typing import Any
 
-from hdc.core import DEFAULT_DIMENSIONS, OPERATIONS, HDC
+from hdc.core import DEFAULT_DIMENSIONS, HDC, OPERATIONS
 from hdc.costs import available_cost_profiles, get_cost_profile
 from hdc.data import load_dataset
 from hdc.model import HDCClassifier, LabeledRecord
 
 
-TRAINING_RECORDS = [
+Result = dict[str, Any]
+
+
+TRAINING_RECORDS: list[LabeledRecord] = [
     ("class_a", {"color": "red", "shape": "circle", "size": "small"}),
     ("class_a", {"color": "orange", "shape": "circle", "size": "small"}),
     ("class_a", {"color": "red", "shape": "square", "size": "medium"}),
@@ -23,7 +27,7 @@ TRAINING_RECORDS = [
     ("class_b", {"color": "blue", "shape": "square", "size": "medium"}),
 ]
 
-TEST_RECORDS = [
+TEST_RECORDS: list[LabeledRecord] = [
     ("class_a", {"color": "orange", "shape": "square", "size": "small"}),
     ("class_a", {"color": "red", "shape": "circle", "size": "medium"}),
     ("class_b", {"color": "green", "shape": "square", "size": "large"}),
@@ -120,10 +124,18 @@ def print_demo_intro(
     print("2. Bundle the training records into class prototypes.")
     print("3. Compare each test record with those prototypes.")
     print(f"training records: {len(training_records)}")
-    print(f"test records:     {len(test_records)}\n")
+    print(f"test records:     {len(test_records)}")
+
+    print("\nTest examples (labels hidden during prediction):")
+    for index, (_, record) in enumerate(test_records, start=1):
+        features = ", ".join(
+            f"{name}={record[name]}" for name in feature_names if name in record
+        )
+        print(f"  {index}. {features}")
+    print()
 
 
-def print_result(result: dict[str, object]) -> None:
+def print_result(result: Result) -> None:
     print("Generic HDC baseline")
     print(f"dimensions: {result['dimensions']}")
     print(f"seed:       {result['seed']}")
@@ -132,6 +144,14 @@ def print_result(result: dict[str, object]) -> None:
         f"({result['accuracy']:.1%})"
     )
     print(f"average margin: {result['average_margin']:.3f}")
+
+    model = result["model"]
+    memory_bytes = model["memory_bytes"]
+    print("model:")
+    print(f"  item vectors: {model['item_vectors']}")
+    print(f"  prototypes:   {model['prototype_vectors']}")
+    print(f"  memory:       {memory_bytes / 1_024:.1f} KiB ({memory_bytes} bytes)")
+
     print("per-class accuracy:")
     for label, stats in result["per_class"].items():
         print(
@@ -172,12 +192,12 @@ def print_result(result: dict[str, object]) -> None:
 def run_experiment(
     dimensions: int,
     seed: int,
-    training_records: list[LabeledRecord],
-    test_records: list[LabeledRecord],
+    training_records: Sequence[LabeledRecord],
+    test_records: Sequence[LabeledRecord],
     cost_profile_name: str = "unconfigured",
     energy_cost: float | None = None,
     latency_cost: float | None = None,
-) -> dict[str, object]:
+) -> Result:
     """Train and evaluate one HDC configuration."""
     profile = get_cost_profile(cost_profile_name)
     energy_costs = profile.energy_pj
@@ -240,9 +260,9 @@ def run_experiment(
 
 def run_sweep(
     args: argparse.Namespace,
-    training_records: list[LabeledRecord],
-    test_records: list[LabeledRecord],
-) -> dict[str, object]:
+    training_records: Sequence[LabeledRecord],
+    test_records: Sequence[LabeledRecord],
+) -> Result:
     """Run every requested dimension and seed combination."""
     dimensions = args.sweep_dimensions or [args.dimensions]
     seeds = args.sweep_seeds or [args.seed]
@@ -259,6 +279,13 @@ def run_sweep(
         for dimension in dimensions
         for seed in seeds
     ]
+    best = max(runs, key=lambda run: (run["accuracy"], run["average_margin"]))
+    best_run = {
+        "dimensions": best["dimensions"],
+        "seed": best["seed"],
+        "accuracy": best["accuracy"],
+        "average_margin": best["average_margin"],
+    }
     return {
         "mode": "sweep",
         "runs": runs,
@@ -268,6 +295,7 @@ def run_sweep(
             "average_margin": (
                 sum(run["average_margin"] for run in runs) / len(runs)
             ),
+            "best_run": best_run,
         },
     }
 
@@ -302,8 +330,17 @@ def main() -> int:
 
     if is_sweep:
         print("Generic HDC experiment sweep")
-        print(f"sweep runs: {result['summary']['run_count']}")
-        print(f"average accuracy: {result['summary']['average_accuracy']:.1%}")
+        summary = result["summary"]
+        best_run = summary["best_run"]
+        print(f"sweep runs: {summary['run_count']}")
+        print(f"average accuracy: {summary['average_accuracy']:.1%}")
+        print(f"average margin: {summary['average_margin']:.3f}")
+        print(
+            "best run: "
+            f"dimensions={best_run['dimensions']}, seed={best_run['seed']}, "
+            f"accuracy={best_run['accuracy']:.1%}, "
+            f"margin={best_run['average_margin']:.3f}"
+        )
     else:
         print_result(result)
     return 0
