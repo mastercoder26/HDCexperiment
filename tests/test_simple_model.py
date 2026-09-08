@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
@@ -65,6 +66,75 @@ class SimpleClassifierTests(unittest.TestCase):
                 "class_b": {"correct": 1, "total": 1, "accuracy": 1.0},
             },
         )
+        self.assertEqual(result["macro_f1"], 1.0)
+        self.assertEqual(
+            result["classification_report"],
+            {
+                "class_a": {
+                    "precision": 1.0,
+                    "recall": 1.0,
+                    "f1": 1.0,
+                    "support": 1,
+                },
+                "class_b": {
+                    "precision": 1.0,
+                    "recall": 1.0,
+                    "f1": 1.0,
+                    "support": 1,
+                },
+            },
+        )
+        self.assertEqual(
+            result["confusion_matrix"],
+            {
+                "labels": ["class_a", "class_b"],
+                "rows": {
+                    "class_a": {"class_a": 1, "class_b": 0},
+                    "class_b": {"class_a": 0, "class_b": 1},
+                },
+            },
+        )
+
+    def test_evaluate_reports_misclassification_metrics(self):
+        self.classifier.train(TRAINING_RECORDS)
+        test_records = [
+            ("class_a", {"color": "red"}),
+            ("class_b", {"color": "blue"}),
+        ]
+        predicted_as_a = {"label": "class_a", "scores": {}, "margin": 0.5}
+
+        with patch.object(
+            self.classifier,
+            "predict",
+            side_effect=[predicted_as_a, predicted_as_a],
+        ):
+            result = self.classifier.evaluate(test_records)
+
+        self.assertAlmostEqual(result["macro_f1"], 1 / 3)
+        self.assertEqual(
+            result["classification_report"],
+            {
+                "class_a": {
+                    "precision": 0.5,
+                    "recall": 1.0,
+                    "f1": 2 / 3,
+                    "support": 1,
+                },
+                "class_b": {
+                    "precision": 0.0,
+                    "recall": 0.0,
+                    "f1": 0.0,
+                    "support": 1,
+                },
+            },
+        )
+        self.assertEqual(
+            result["confusion_matrix"]["rows"],
+            {
+                "class_a": {"class_a": 1, "class_b": 0},
+                "class_b": {"class_a": 1, "class_b": 0},
+            },
+        )
 
     def test_evaluate_empty_test_set_returns_empty_metrics(self):
         self.classifier.train(TRAINING_RECORDS)
@@ -74,6 +144,17 @@ class SimpleClassifierTests(unittest.TestCase):
         self.assertEqual(result["accuracy"], 0.0)
         self.assertEqual(result["average_margin"], 0.0)
         self.assertEqual(result["per_class"], {})
+        self.assertEqual(result["macro_f1"], 0.0)
+        self.assertEqual(
+            result["confusion_matrix"],
+            {
+                "labels": ["class_a", "class_b"],
+                "rows": {
+                    "class_a": {"class_a": 0, "class_b": 0},
+                    "class_b": {"class_a": 0, "class_b": 0},
+                },
+            },
+        )
 
     def test_predict_batch_returns_one_result_per_record(self):
         self.classifier.train(TRAINING_RECORDS)

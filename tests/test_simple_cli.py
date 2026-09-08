@@ -1,3 +1,4 @@
+import csv
 import json
 import subprocess
 import sys
@@ -15,7 +16,7 @@ class SimpleCommandLineTests(unittest.TestCase):
             text=True,
         )
 
-        self.assertEqual(completed.stdout.strip(), "hdc-baseline 1.2.2")
+        self.assertEqual(completed.stdout.strip(), "hdc-baseline 1.3.0")
 
     def test_command_line_dimension_reaches_saved_result(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -48,6 +49,9 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertGreaterEqual(result["timing_ms"]["total"], 0.0)
         self.assertIn("training time:", completed.stdout)
         self.assertIn("average margin:", completed.stdout)
+        self.assertIn("macro F1:", completed.stdout)
+        self.assertIn("classification report:", completed.stdout)
+        self.assertIn("confusion matrix:", completed.stdout)
         self.assertIn("dataset:    6 training / 4 test / 2 classes", completed.stdout)
         self.assertIn("accuracy bar: [###############-----] 75.0%", completed.stdout)
         self.assertIn("[OK]", completed.stdout)
@@ -63,6 +67,45 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertIn("item vectors:", completed.stdout)
         self.assertIn("prototypes:", completed.stdout)
         self.assertIn("memory:", completed.stdout)
+
+    def test_command_line_exports_predictions_to_csv(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            csv_output = Path(temporary_directory) / "predictions.csv"
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "main.py",
+                    "--dimensions",
+                    "30",
+                    "--seed",
+                    "42",
+                    "--csv-output",
+                    str(csv_output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            with csv_output.open(newline="", encoding="utf-8") as csv_file:
+                rows = list(csv.DictReader(csv_file))
+
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(
+            list(rows[0]),
+            [
+                "record",
+                "true_label",
+                "predicted_label",
+                "correct",
+                "margin",
+                "score_class_a",
+                "score_class_b",
+            ],
+        )
+        self.assertEqual(rows[0]["record"], "1")
+        self.assertEqual(rows[0]["true_label"], "class_a")
+        self.assertIn(rows[0]["correct"], {"True", "False"})
+        self.assertIn(f"saved CSV: {csv_output}", completed.stdout)
 
     def test_command_line_runs_dimension_and_seed_sweep(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -91,6 +134,7 @@ class SimpleCommandLineTests(unittest.TestCase):
             {(30, 1), (30, 2), (60, 1), (60, 2)},
         )
         self.assertIn("average_accuracy", result["summary"])
+        self.assertIn("average_macro_f1", result["summary"])
         self.assertIn("average_margin", result["summary"])
         self.assertIn("best_run", result["summary"])
         self.assertEqual(
@@ -98,12 +142,58 @@ class SimpleCommandLineTests(unittest.TestCase):
             {"dimensions", "seed", "accuracy", "average_margin"},
         )
         self.assertIn("sweep runs: 4", completed.stdout)
+        self.assertIn("average macro F1:", completed.stdout)
         self.assertIn("average margin:", completed.stdout)
         self.assertIn("run details:", completed.stdout)
         self.assertIn("dimensions=30 seed=1", completed.stdout)
         self.assertIn("dimensions=60 seed=2", completed.stdout)
+        self.assertIn("F1=", completed.stdout)
         self.assertIn("best run:", completed.stdout)
         self.assertIn(f"saved results: {output}", completed.stdout)
+
+    def test_command_line_exports_sweep_summary_to_csv(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            csv_output = Path(temporary_directory) / "sweep.csv"
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    "main.py",
+                    "--sweep-dimensions",
+                    "30,60",
+                    "--sweep-seeds",
+                    "1,2",
+                    "--csv-output",
+                    str(csv_output),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            with csv_output.open(newline="", encoding="utf-8") as csv_file:
+                rows = list(csv.DictReader(csv_file))
+
+        self.assertEqual(len(rows), 4)
+        self.assertEqual(
+            list(rows[0]),
+            [
+                "dimensions",
+                "seed",
+                "accuracy",
+                "macro_f1",
+                "average_margin",
+                "memory_bytes",
+                "total_work_units",
+                "total_energy_pj",
+                "total_latency_ns",
+                "training_ms",
+                "inference_ms",
+            ],
+        )
+        self.assertEqual(
+            {(row["dimensions"], row["seed"]) for row in rows},
+            {("30", "1"), ("30", "2"), ("60", "1"), ("60", "2")},
+        )
+        self.assertIn(f"saved CSV: {csv_output}", completed.stdout)
 
     def test_command_line_demo_explains_the_built_in_example(self):
         completed = subprocess.run(

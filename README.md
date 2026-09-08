@@ -22,7 +22,7 @@ macOS or Linux:
 ./hdc-baseline --demo
 ```
 
-The demo starts by showing its goal, all six training examples, and the four held-out test records in plain language. It then prints labeled predictions, an accuracy bar, similarity margins, dataset and model details, operation counts, and run time. Experiment sweeps list every run and highlight the best-performing configuration, and saved JSON files are confirmed in the terminal.
+The demo starts by showing its goal, all six training examples, and the four held-out test records in plain language. It then prints labeled predictions, an accuracy bar, similarity margins, precision/recall/F1 scores, a confusion matrix, dataset and model details, operation counts, and run time. Experiment sweeps list every run and highlight the best-performing configuration, while JSON and CSV exports make results easy to analyze elsewhere.
 
 If macOS blocks the unsigned file, run:
 
@@ -54,14 +54,17 @@ The included dataset is intentionally small. Its accuracy shows that the pipelin
 # Change the vector size and random seed
 ./hdc-baseline --dimensions 5000 --seed 7
 
-# Compare several configurations and save the results
+# Compare several configurations and save the full results
 ./hdc-baseline --sweep-dimensions 1000,5000 --sweep-seeds 7,42 --output sweep.json
 
-# Load your own categorical dataset
-./hdc-baseline --dataset dataset.json --output result.json
+# Export a compact sweep summary for a spreadsheet or plotting tool
+./hdc-baseline --sweep-dimensions 1000,5000 --sweep-seeds 7,42 --csv-output sweep.csv
+
+# Load your own categorical dataset and export prediction rows
+./hdc-baseline --dataset dataset.json --output result.json --csv-output predictions.csv
 ```
 
-Use `./hdc-baseline --help` to see every option.
+Use `./hdc-baseline --help` to see every option. For a normal run, the CSV contains one row per prediction with every class score. For a sweep, it contains one row per dimensions/seed combination with accuracy, macro F1, margin, memory, operation totals, cost estimates, and timing.
 
 ## Challenges
 

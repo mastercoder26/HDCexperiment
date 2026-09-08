@@ -117,12 +117,58 @@ class HDCClassifier:
                 **stats,
                 "accuracy": stats["correct"] / stats["total"],
             }
+
+        labels = sorted(
+            set(self.prototypes)
+            | {label for label, _ in test_records}
+            | {str(prediction["predicted_label"]) for prediction in predictions}
+        )
+        confusion_rows = {
+            true_label: {predicted_label: 0 for predicted_label in labels}
+            for true_label in labels
+        }
+        for prediction in predictions:
+            true_label = str(prediction["true_label"])
+            predicted_label = str(prediction["predicted_label"])
+            confusion_rows[true_label][predicted_label] += 1
+
+        classification_report = {}
+        for label in labels:
+            true_positives = confusion_rows[label][label]
+            support = sum(confusion_rows[label].values())
+            predicted_total = sum(row[label] for row in confusion_rows.values())
+            precision = true_positives / predicted_total if predicted_total else 0.0
+            recall = true_positives / support if support else 0.0
+            f1 = (
+                2 * precision * recall / (precision + recall)
+                if precision + recall
+                else 0.0
+            )
+            classification_report[label] = {
+                "precision": precision,
+                "recall": recall,
+                "f1": f1,
+                "support": support,
+            }
+
+        macro_f1 = (
+            sum(metrics["f1"] for metrics in classification_report.values())
+            / len(classification_report)
+            if classification_report
+            else 0.0
+        )
         return {
             "correct": correct,
             "total": total,
             "accuracy": correct / total if total else 0.0,
             "average_margin": margin_total / total if total else 0.0,
+            "macro_f1": macro_f1,
             "per_class": per_class,
+            "classification_report": classification_report,
+            "confusion_matrix": {
+                "labels": labels,
+                "rows": confusion_rows,
+            },
             "predictions": predictions,
         }
 

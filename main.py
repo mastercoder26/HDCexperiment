@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from collections.abc import Sequence
 from pathlib import Path
@@ -98,6 +99,11 @@ def read_arguments() -> argparse.Namespace:
         help="optional JSON file containing training and test records",
     )
     parser.add_argument("--output", type=Path, help="optional JSON output path")
+    parser.add_argument(
+        "--csv-output",
+        type=Path,
+        help="optional CSV path for predictions or sweep summaries",
+    )
     return parser.parse_args()
 
 
@@ -158,6 +164,7 @@ def print_result(result: Result) -> None:
     accuracy_bar = "#" * filled + "-" * (20 - filled)
     print(f"accuracy bar: [{accuracy_bar}] {result['accuracy']:.1%}")
     print(f"average margin: {result['average_margin']:.3f}")
+    print(f"macro F1:       {result['macro_f1']:.3f}")
 
     model = result["model"]
     memory_bytes = model["memory_bytes"]
@@ -166,12 +173,26 @@ def print_result(result: Result) -> None:
     print(f"  prototypes:   {model['prototype_vectors']}")
     print(f"  memory:       {memory_bytes / 1_024:.1f} KiB ({memory_bytes} bytes)")
 
-    print("per-class accuracy:")
-    for label, stats in result["per_class"].items():
+    print("classification report:")
+    for label, metrics in result["classification_report"].items():
         print(
-            f"  {label}: {stats['correct']}/{stats['total']} "
-            f"({stats['accuracy']:.1%})"
+            f"  {label}: precision={metrics['precision']:.3f} "
+            f"recall={metrics['recall']:.3f} F1={metrics['f1']:.3f} "
+            f"support={metrics['support']}"
         )
+
+    confusion_matrix = result["confusion_matrix"]
+    labels = confusion_matrix["labels"]
+    label_width = max((len(label) for label in labels), default=5)
+    cell_width = max(label_width, 5)
+    print("confusion matrix:")
+    print("  rows=true, columns=predicted")
+    header = " ".join(f"{label:>{cell_width}}" for label in labels)
+    print(" " * (label_width + 2) + header)
+    for label in labels:
+        row = confusion_matrix["rows"][label]
+        counts = " ".join(f"{row[predicted]:>{cell_width}}" for predicted in labels)
+        print(f"  {label:>{label_width}} {counts}")
 
     print("\npredictions:")
     for prediction in result["predictions"]:
@@ -202,6 +223,72 @@ def print_result(result: Result) -> None:
     timing = result["timing_ms"]
     print(f"training time:  {timing['training']:.3f} ms")
     print(f"inference time: {timing['inference']:.3f} ms")
+
+
+def write_csv_result(result: Result, path: Path) -> None:
+    """Write prediction details or sweep summaries to a CSV file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if result.get("mode") == "sweep":
+        fieldnames = [
+            "dimensions",
+            "seed",
+            "accuracy",
+            "macro_f1",
+            "average_margin",
+            "memory_bytes",
+            "total_work_units",
+            "total_energy_pj",
+            "total_latency_ns",
+            "training_ms",
+            "inference_ms",
+        ]
+        rows = []
+        for run in result["runs"]:
+            simulation = run["simulation"]
+            timing = run["timing_ms"]
+            rows.append(
+                {
+                    "dimensions": run["dimensions"],
+                    "seed": run["seed"],
+                    "accuracy": run["accuracy"],
+                    "macro_f1": run["macro_f1"],
+                    "average_margin": run["average_margin"],
+                    "memory_bytes": run["memory_bytes"],
+                    "total_work_units": simulation["total_work_units"],
+                    "total_energy_pj": simulation["total_energy_pj"],
+                    "total_latency_ns": simulation["total_latency_ns"],
+                    "training_ms": timing["training"],
+                    "inference_ms": timing["inference"],
+                }
+            )
+    else:
+        labels = result["confusion_matrix"]["labels"]
+        fieldnames = [
+            "record",
+            "true_label",
+            "predicted_label",
+            "correct",
+            "margin",
+            *(f"score_{label}" for label in labels),
+        ]
+        rows = []
+        for index, prediction in enumerate(result["predictions"], start=1):
+            scores = prediction["scores"]
+            rows.append(
+                {
+                    "record": index,
+                    "true_label": prediction["true_label"],
+                    "predicted_label": prediction["predicted_label"],
+                    "correct": prediction["correct"],
+                    "margin": prediction["margin"],
+                    **{f"score_{label}": scores.get(label, "") for label in labels},
+                }
+            )
+
+    with path.open("w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def run_experiment(
@@ -307,6 +394,9 @@ def run_sweep(
         "summary": {
             "run_count": len(runs),
             "average_accuracy": sum(run["accuracy"] for run in runs) / len(runs),
+            "average_macro_f1": (
+                sum(run["macro_f1"] for run in runs) / len(runs)
+            ),
             "average_margin": (
                 sum(run["average_margin"] for run in runs) / len(runs)
             ),
@@ -342,6 +432,8 @@ def main() -> int:
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    if args.csv_output:
+        write_csv_result(result, args.csv_output)
 
     if is_sweep:
         print("Generic HDC experiment sweep")
@@ -349,12 +441,14 @@ def main() -> int:
         best_run = summary["best_run"]
         print(f"sweep runs: {summary['run_count']}")
         print(f"average accuracy: {summary['average_accuracy']:.1%}")
+        print(f"average macro F1: {summary['average_macro_f1']:.3f}")
         print(f"average margin: {summary['average_margin']:.3f}")
         print("run details:")
         for run in result["runs"]:
             print(
                 f"  dimensions={run['dimensions']} seed={run['seed']} "
                 f"accuracy={run['accuracy']:.1%} "
+                f"F1={run['macro_f1']:.3f} "
                 f"margin={run['average_margin']:.3f}"
             )
         print(
@@ -368,6 +462,8 @@ def main() -> int:
 
     if args.output:
         print(f"\nsaved results: {args.output}")
+    if args.csv_output:
+        print(f"\nsaved CSV: {args.csv_output}")
     return 0
 
 
