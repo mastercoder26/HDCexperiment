@@ -60,7 +60,14 @@ def parse_int_list(raw_value: str) -> list[int]:
 
 
 def read_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="HDC baseline classifier.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Hyperdimensional Computing (HDC) baseline classifier.\n"
+            "A brain-inspired, ultra-lightweight classification system "
+            "designed for IoT and edge computing."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "--version",
         action="version",
@@ -70,32 +77,37 @@ def read_arguments() -> argparse.Namespace:
     mode_group.add_argument(
         "--demo",
         action="store_true",
-        help="explain and run the built-in HDC example",
+        help="explain what HDC is, walk through the built-in dataset, and run the classification",
     )
     parser.add_argument(
         "--dimensions",
         type=int,
         default=DEFAULT_DIMENSIONS,
-        help=f"hypervector length (default: {DEFAULT_DIMENSIONS})",
+        help=f"hypervector length / dimensions (default: {DEFAULT_DIMENSIONS:,})",
     )
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="random seed for repeatable hypervector generation (default: 42)",
+    )
     parser.add_argument(
         "--sweep-dimensions",
         type=parse_int_list,
         default=None,
-        help="comma-separated dimensions for an experiment sweep",
+        help="comma-separated dimensions for an experiment sweep (e.g. 1000,5000)",
     )
     parser.add_argument(
         "--sweep-seeds",
         type=parse_int_list,
         default=None,
-        help="comma-separated seeds for an experiment sweep",
+        help="comma-separated seeds for an experiment sweep (e.g. 7,42)",
     )
     parser.add_argument(
         "--cost-profile",
         choices=available_cost_profiles(),
         default="unconfigured",
-        help="named operation-specific analytical cost assumptions",
+        help="named operation-specific analytical cost assumptions (default: unconfigured)",
     )
     parser.add_argument(
         "--energy-cost",
@@ -113,19 +125,19 @@ def read_arguments() -> argparse.Namespace:
         "--dataset",
         type=Path,
         default=None,
-        help="optional JSON file containing training and test records",
+        help="optional JSON file containing custom training and test records",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=None,
-        help="optional JSON output path",
+        help="optional JSON output path to save complete experiment metrics",
     )
     parser.add_argument(
         "--csv-output",
         type=Path,
         default=None,
-        help="optional CSV path for predictions or sweep summaries",
+        help="optional CSV path for prediction rows or sweep summaries",
     )
     return parser.parse_args()
 
@@ -136,6 +148,30 @@ def _label_status(correct: bool) -> str:
 
 def _format_percent(value: float) -> str:
     return f"{value:.1%}"
+
+
+def print_run_intro(
+    training_records: Sequence[LabeledRecord],
+    test_records: Sequence[LabeledRecord],
+    dimensions: int,
+) -> None:
+    labels = sorted({label for label, _ in training_records})
+    print("=" * 50)
+    print("  HYPERDIMENSIONAL COMPUTING (HDC) CLASSIFIER")
+    print("=" * 50)
+    print()
+    print("What is Hyperdimensional Computing?")
+    print("  HDC is a brain-inspired computing method that encodes data into")
+    print(f"  high-dimensional hypervectors ({dimensions:,} numbers of -1 and +1).")
+    print("  Instead of training deep neural networks with backpropagation,")
+    print("  HDC learns in a single fast pass by combining vectors with simple")
+    print("  math (bind & bundle), and classifies by vector similarity.")
+    print()
+    print("What this run is doing:")
+    print(f"  1. Learning from {len(training_records)} examples across {len(labels)} classes ({', '.join(labels)}).")
+    print("  2. Bundling learned patterns into an average prototype vector for each class.")
+    print(f"  3. Testing on {len(test_records)} held-out examples to measure accuracy and confidence.")
+    print()
 
 
 def print_demo_intro(
@@ -157,6 +193,12 @@ def print_demo_intro(
     print("=" * 50)
     print("  HDC CLASSIFIER — DEMO")
     print("=" * 50)
+    print()
+    print("What is Hyperdimensional Computing?")
+    print("  HDC is a brain-inspired computing method that encodes patterns into")
+    print("  long vectors of numbers (hypervectors). Instead of heavy neural")
+    print("  networks, it combines patterns with simple math (bind & bundle) and")
+    print("  classifies by comparing similarity—ideal for low-power edge devices.")
     print()
     print("What this does:")
     print(f"  It learns to tell {label_text} apart by looking at {feature_text}.")
@@ -288,6 +330,49 @@ def print_result(result: Result) -> None:
     )
     print(
         f"    Prediction time:     {timing['inference']:.3f} ms"
+    )
+    print()
+
+    print("  Interpretation & what this means:")
+    if accuracy == 1.0:
+        print(
+            f"    • Accuracy ({_format_percent(accuracy)}): Perfect score! "
+            f"All {result['correct']} out of {result['total']} test examples were correctly identified."
+        )
+    elif accuracy >= 0.75:
+        print(
+            f"    • Accuracy ({_format_percent(accuracy)}): Strong performance. "
+            f"The model got {result['correct']} out of {result['total']} test examples right."
+        )
+    else:
+        print(
+            f"    • Accuracy ({_format_percent(accuracy)}): The model made errors "
+            f"({result['correct']}/{result['total']} correct). Increasing dimensions "
+            f"or adding training examples helps separate overlapping classes."
+        )
+
+    margin = result["average_margin"]
+    if margin >= 0.3:
+        print(
+            f"    • Confidence margin ({margin:.3f}): High. Winning classes had "
+            "significantly higher cosine similarity than runners-up, indicating decisive predictions."
+        )
+    elif margin > 0.0:
+        print(
+            f"    • Confidence margin ({margin:.3f}): Moderate. Predictions were correct, "
+            "but similarity scores between competing classes were relatively close."
+        )
+    else:
+        print(
+            f"    • Confidence margin ({margin:.3f}): Low. Class representations overlapped, "
+            "indicating uncertain classification decisions."
+        )
+
+    work_units = simulation["total_work_units"]
+    print(
+        f"    • Edge efficiency: Completed in {timing['total']:.2f} ms total using {work_units:,} "
+        f"work units and {memory_bytes / 1_024:.1f} KiB of RAM. Because HDC uses simple vector "
+        "operations rather than deep neural network backpropagation, it is ideal for low-power edge and IoT chips."
     )
     print()
     print("=" * 50)
@@ -502,6 +587,8 @@ def main() -> int:
 
     if args.demo:
         print_demo_intro(training_records, test_records)
+    elif not is_sweep:
+        print_run_intro(training_records, test_records, args.dimensions)
 
     if is_sweep:
         sweep_dimensions = args.sweep_dimensions or [args.dimensions]
@@ -559,6 +646,16 @@ def main() -> int:
             f"seed={best_run['seed']}, "
             f"accuracy={_format_percent(best_run['accuracy'])}, "
             f"margin={best_run['average_margin']:.3f}"
+        )
+        print()
+        print("  Interpretation & sweep insights:")
+        print(
+            f"    • Top performer: dimensions={best_run['dimensions']} with seed={best_run['seed']} "
+            f"achieved {_format_percent(best_run['accuracy'])} accuracy and {best_run['average_margin']:.3f} margin."
+        )
+        print(
+            "    • Dimensionality: In HDC, higher dimensions provide more orthogonal vector capacity, "
+            "reducing interference between learned patterns."
         )
         print()
         print("=" * 50)

@@ -16,7 +16,7 @@ class SimpleCommandLineTests(unittest.TestCase):
             text=True,
         )
 
-        self.assertEqual(completed.stdout.strip(), "hdc-baseline 1.4.0")
+        self.assertEqual(completed.stdout.strip(), "hdc-baseline 1.4.1")
 
     def test_command_line_dimension_reaches_saved_result(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -38,6 +38,9 @@ class SimpleCommandLineTests(unittest.TestCase):
             )
             result = json.loads(output.read_text(encoding="utf-8"))
 
+        self.assertIn("HYPERDIMENSIONAL COMPUTING (HDC) CLASSIFIER", completed.stdout)
+        self.assertIn("What is Hyperdimensional Computing?", completed.stdout)
+        self.assertIn("What this run is doing:", completed.stdout)
         self.assertIn("HDC CLASSIFIER — RESULTS", completed.stdout)
         self.assertIn("Dimensions: 30", completed.stdout)
         self.assertEqual(result["experiment"], "generic_categorical_baseline")
@@ -56,6 +59,8 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertIn("Confidence:", completed.stdout)
         self.assertIn("correct true=", completed.stdout)
         self.assertIn("WRONG   true=", completed.stdout)
+        self.assertIn("Interpretation & what this means:", completed.stdout)
+        self.assertIn("Edge efficiency:", completed.stdout)
         self.assertIn(f"Saved results: {output}", completed.stdout)
         self.assertEqual(result["dataset"]["training_records"], 6)
         self.assertEqual(result["dataset"]["test_records"], 4)
@@ -149,6 +154,8 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertIn("dimensions=30 seed=1", completed.stdout)
         self.assertIn("dimensions=60 seed=2", completed.stdout)
         self.assertIn("Best configuration:", completed.stdout)
+        self.assertIn("Interpretation & sweep insights:", completed.stdout)
+        self.assertIn("Top performer:", completed.stdout)
         self.assertIn(f"Saved results: {output}", completed.stdout)
         self.assertIn("=" * 50, completed.stdout)
 
@@ -213,6 +220,7 @@ class SimpleCommandLineTests(unittest.TestCase):
         )
 
         self.assertIn("HDC CLASSIFIER — DEMO", completed.stdout)
+        self.assertIn("What is Hyperdimensional Computing?", completed.stdout)
         self.assertIn(
             "It learns to tell class_a and class_b apart",
             completed.stdout,
@@ -237,6 +245,7 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertIn("Test examples (the computer will try to guess these):", completed.stdout)
         self.assertIn("color=orange, shape=square, size=small", completed.stdout)
         self.assertIn("color=blue, shape=triangle, size=medium", completed.stdout)
+        self.assertIn("Interpretation & what this means:", completed.stdout)
         self.assertIn("=" * 50, completed.stdout)
 
     def test_command_line_uses_named_cost_profile(self):
