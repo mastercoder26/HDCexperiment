@@ -1,26 +1,22 @@
-"""Run the example HDC classifier."""
+"""Command-line interface for the HDC baseline classifier."""
 
 from __future__ import annotations
 
 import argparse
 import csv
 import json
-from collections.abc import Sequence
 from pathlib import Path
 from time import perf_counter
-from typing import Any
+from typing import Any, Sequence
 
-from hdc import __version__
-from hdc.core import DEFAULT_DIMENSIONS, HDC, OPERATIONS
+from hdc import DEFAULT_DIMENSIONS, HDC, CostProfile, HDCClassifier, __version__
+from hdc.core import OPERATIONS
 from hdc.costs import available_cost_profiles, get_cost_profile
-from hdc.data import load_dataset
-from hdc.model import HDCClassifier, LabeledRecord
-
+from hdc.data import LabeledRecord, load_dataset
 
 Result = dict[str, Any]
 
-
-TRAINING_RECORDS: list[LabeledRecord] = [
+EXAMPLE_DATASET: list[LabeledRecord] = [
     ("class_a", {"color": "red", "shape": "circle", "size": "small"}),
     ("class_a", {"color": "orange", "shape": "circle", "size": "small"}),
     ("class_a", {"color": "red", "shape": "square", "size": "medium"}),
@@ -29,7 +25,7 @@ TRAINING_RECORDS: list[LabeledRecord] = [
     ("class_b", {"color": "blue", "shape": "square", "size": "medium"}),
 ]
 
-TEST_RECORDS: list[LabeledRecord] = [
+EXAMPLE_TEST_RECORDS: list[LabeledRecord] = [
     ("class_a", {"color": "orange", "shape": "square", "size": "small"}),
     ("class_a", {"color": "red", "shape": "circle", "size": "medium"}),
     ("class_b", {"color": "green", "shape": "square", "size": "large"}),
@@ -37,14 +33,30 @@ TEST_RECORDS: list[LabeledRecord] = [
 ]
 
 
-def comma_separated_integers(value: str) -> list[int]:
-    try:
-        numbers = [int(part.strip()) for part in value.split(",") if part.strip()]
-    except ValueError as error:
-        raise argparse.ArgumentTypeError("expected comma-separated integers") from error
-    if not numbers:
-        raise argparse.ArgumentTypeError("expected at least one integer")
-    return numbers
+def parse_int_list(raw_value: str) -> list[int]:
+    """Parse a comma-separated list of positive integers."""
+    values: list[int] = []
+    for chunk in raw_value.split(","):
+        stripped = chunk.strip()
+        if not stripped:
+            continue
+        try:
+            value = int(stripped)
+        except ValueError as error:
+            raise argparse.ArgumentTypeError(
+                f"expected integer, got {chunk!r}"
+            ) from error
+        if value <= 0:
+            raise argparse.ArgumentTypeError(
+                f"expected positive integer, got {value}"
+            )
+        values.append(value)
+
+    if not values:
+        raise argparse.ArgumentTypeError(
+            "expected at least one positive integer"
+        )
+    return values
 
 
 def read_arguments() -> argparse.Namespace:
@@ -54,8 +66,8 @@ def read_arguments() -> argparse.Namespace:
         action="version",
         version=f"hdc-baseline {__version__}",
     )
-    input_source = parser.add_mutually_exclusive_group()
-    input_source.add_argument(
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
         "--demo",
         action="store_true",
         help="explain and run the built-in HDC example",
@@ -69,12 +81,14 @@ def read_arguments() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--sweep-dimensions",
-        type=comma_separated_integers,
+        type=parse_int_list,
+        default=None,
         help="comma-separated dimensions for an experiment sweep",
     )
     parser.add_argument(
         "--sweep-seeds",
-        type=comma_separated_integers,
+        type=parse_int_list,
+        default=None,
         help="comma-separated seeds for an experiment sweep",
     )
     parser.add_argument(
@@ -86,25 +100,42 @@ def read_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--energy-cost",
         type=float,
+        default=None,
         help="uniform picojoules per work unit; overrides the named profile",
     )
     parser.add_argument(
         "--latency-cost",
         type=float,
+        default=None,
         help="uniform nanoseconds per work unit; overrides the named profile",
     )
-    input_source.add_argument(
+    mode_group.add_argument(
         "--dataset",
         type=Path,
+        default=None,
         help="optional JSON file containing training and test records",
     )
-    parser.add_argument("--output", type=Path, help="optional JSON output path")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="optional JSON output path",
+    )
     parser.add_argument(
         "--csv-output",
         type=Path,
+        default=None,
         help="optional CSV path for predictions or sweep summaries",
     )
     return parser.parse_args()
+
+
+def _label_status(correct: bool) -> str:
+    return "correct" if correct else "WRONG"
+
+
+def _format_percent(value: float) -> str:
+    return f"{value:.1%}"
 
 
 def print_demo_intro(
@@ -113,116 +144,153 @@ def print_demo_intro(
 ) -> None:
     labels = sorted({label for label, _ in training_records})
     feature_names = sorted(
-        {feature for _, record in training_records for feature in record}
+        {name for _, record in training_records for name in record}
     )
     label_text = " and ".join(labels)
     if len(feature_names) > 2:
-        feature_text = f"{', '.join(feature_names[:-1])}, and {feature_names[-1]}"
+        feature_text = (
+            ", ".join(feature_names[:-1]) + f", and {feature_names[-1]}"
+        )
     else:
         feature_text = " and ".join(feature_names)
 
-    print("HDC demo\n")
-    print("Goal:")
-    print(f"Learn to tell {label_text} apart using {feature_text}.\n")
-    print("Training examples:")
+    print("=" * 50)
+    print("  HDC CLASSIFIER — DEMO")
+    print("=" * 50)
+    print()
+    print("What this does:")
+    print(f"  It learns to tell {label_text} apart by looking at {feature_text}.")
+    print()
+    print("Training examples (what it learns from):")
     for label, record in training_records:
         features = ", ".join(
             f"{name}={record[name]}" for name in feature_names if name in record
         )
-        print(f"  {label}: {features}")
+        print(f"    {label}: {features}")
 
-    print("\nHow HDC handles the examples:")
-    print("1. Encode each record as a hypervector.")
-    print("2. Bundle the training records into class prototypes.")
-    print("3. Compare each test record with those prototypes.")
-    print(f"training records: {len(training_records)}")
-    print(f"test records:     {len(test_records)}")
+    print()
+    print("How it works:")
+    print("    1. Each record is turned into a long list of numbers.")
+    print("    2. Records of the same type are grouped into an average.")
+    print("    3. New records are compared to those averages to guess their type.")
+    print()
+    print(f"    Training data: {len(training_records)} examples")
+    print(f"    Test data:     {len(test_records)} examples")
 
-    print("\nTest examples (labels hidden during prediction):")
+    print()
+    print("Test examples (the computer will try to guess these):")
     for index, (_, record) in enumerate(test_records, start=1):
         features = ", ".join(
             f"{name}={record[name]}" for name in feature_names if name in record
         )
-        print(f"  {index}. {features}")
+        print(f"    {index}. {features}")
+    print()
+    print("=" * 50)
     print()
 
 
 def print_result(result: Result) -> None:
-    print("Generic HDC baseline")
-    print(f"dimensions: {result['dimensions']}")
-    print(f"seed:       {result['seed']}")
+    accuracy = result["accuracy"]
+    filled = round(accuracy * 20)
+    bar = "#" * filled + "-" * (20 - filled)
+
+    print("=" * 50)
+    print("  HDC CLASSIFIER — RESULTS")
+    print("=" * 50)
+    print()
+    print(f"  Dimensions: {result['dimensions']:,}")
+    print(f"  Random seed: {result['seed']}")
+    print()
+
     dataset = result["dataset"]
+    print("  Dataset:")
     print(
-        f"dataset:    {dataset['training_records']} training / "
-        f"{dataset['test_records']} test / {len(dataset['classes'])} classes"
+        f"    {dataset['training_records']} training examples, "
+        f"{dataset['test_records']} test examples, "
+        f"{len(dataset['classes'])} types"
     )
-    print(
-        f"accuracy:   {result['correct']}/{result['total']} "
-        f"({result['accuracy']:.1%})"
-    )
-    filled = round(result["accuracy"] * 20)
-    accuracy_bar = "#" * filled + "-" * (20 - filled)
-    print(f"accuracy bar: [{accuracy_bar}] {result['accuracy']:.1%}")
-    print(f"average margin: {result['average_margin']:.3f}")
-    print(f"macro F1:       {result['macro_f1']:.3f}")
+    print()
+
+    print("  How well it did:")
+    print(f"    Correct:    {result['correct']} out of {result['total']}")
+    print(f"    Accuracy:   {_format_percent(accuracy)}")
+    print(f"    Confidence: [{bar}] {_format_percent(accuracy)}")
+    print(f"    Average margin: {result['average_margin']:.3f}")
+    print(f"    Overall score (F1): {result['macro_f1']:.3f}")
+    print()
 
     model = result["model"]
     memory_bytes = model["memory_bytes"]
-    print("model:")
-    print(f"  item vectors: {model['item_vectors']}")
-    print(f"  prototypes:   {model['prototype_vectors']}")
-    print(f"  memory:       {memory_bytes / 1_024:.1f} KiB ({memory_bytes} bytes)")
+    print("  Model size:")
+    print(f"    Learned patterns: {model['item_vectors']}")
+    print(f"    Type averages:    {model['prototype_vectors']}")
+    print(f"    Memory used:      {memory_bytes / 1_024:.1f} KiB ({memory_bytes} bytes)")
+    print()
 
-    print("classification report:")
-    for label, metrics in result["classification_report"].items():
+    report = result["classification_report"]
+    print("  Breakdown by type:")
+    for label, metrics in report.items():
         print(
-            f"  {label}: precision={metrics['precision']:.3f} "
-            f"recall={metrics['recall']:.3f} F1={metrics['f1']:.3f} "
-            f"support={metrics['support']}"
+            f"    {label}: "
+            f"precision={_format_percent(metrics['precision'])} "
+            f"recall={_format_percent(metrics['recall'])} "
+            f"F1={_format_percent(metrics['f1'])} "
+            f"examples={metrics['support']}"
         )
+    print()
 
     confusion_matrix = result["confusion_matrix"]
     labels = confusion_matrix["labels"]
-    label_width = max((len(label) for label in labels), default=5)
-    cell_width = max(label_width, 5)
-    print("confusion matrix:")
-    print("  rows=true, columns=predicted")
-    header = " ".join(f"{label:>{cell_width}}" for label in labels)
-    print(" " * (label_width + 2) + header)
+    label_width = max((len(label) for label in labels), default=7)
+    label_width = max(label_width, 7)
+    cell_width = max(label_width, 7)
+    print("  Prediction grid (rows = actual type, columns = guessed type):")
+    header = " " * (label_width + 1) + " ".join(
+        f"{label:^{cell_width}}" for label in labels
+    )
+    print(f"    {header}")
     for label in labels:
         row = confusion_matrix["rows"][label]
-        counts = " ".join(f"{row[predicted]:>{cell_width}}" for predicted in labels)
-        print(f"  {label:>{label_width}} {counts}")
+        counts = " ".join(
+            f"{row[predicted]:^{cell_width}}" for predicted in labels
+        )
+        print(f"    {label:<{label_width}} {counts}")
+    print()
 
-    print("\npredictions:")
+    print("  Individual predictions:")
     for prediction in result["predictions"]:
+        status = _label_status(prediction["correct"])
         scores = ", ".join(
-            f"{label}={score:.3f}"
+            f"{label}={_format_percent(score)}"
             for label, score in sorted(prediction["scores"].items())
         )
-        status = "OK" if prediction["correct"] else "MISS"
         print(
-            f"  [{status}] true={prediction['true_label']:<7} "
-            f"predicted={prediction['predicted_label']:<7} "
+            f"    {status:<7} true={prediction['true_label']:<{label_width}} "
+            f"guessed={prediction['predicted_label']:<{label_width}} "
             f"margin={prediction['margin']:.3f} ({scores})"
         )
+    print()
 
     simulation = result["simulation"]
-    print("\noperation counts:")
-    for name, details in simulation["operations"].items():
-        if details["calls"]:
-            print(
-                f"  {name:<10} calls={details['calls']:<3} "
-                f"work_units={details['work_units']}"
-            )
-    print(
-        "estimated totals: "
-        f"{simulation['total_energy_pj']:.3f} pJ, "
-        f"{simulation['total_latency_ns']:.3f} ns"
-    )
     timing = result["timing_ms"]
-    print(f"training time:  {timing['training']:.3f} ms")
-    print(f"inference time: {timing['inference']:.3f} ms")
+    print("  Performance:")
+    print(
+        f"    Total work units:    {simulation['total_work_units']:,}"
+    )
+    print(
+        f"    Estimated energy:    {simulation['total_energy_pj']:.3f} pJ"
+    )
+    print(
+        f"    Estimated latency:   {simulation['total_latency_ns']:.3f} ns"
+    )
+    print(
+        f"    Training time:       {timing['training']:.3f} ms"
+    )
+    print(
+        f"    Prediction time:     {timing['inference']:.3f} ms"
+    )
+    print()
+    print("=" * 50)
 
 
 def write_csv_result(result: Result, path: Path) -> None:
@@ -356,74 +424,103 @@ def run_experiment(
             "seed": seed,
             "cost_profile": profile.name,
             "cost_profile_description": profile.description,
+            "energy_cost": energy_cost,
+            "latency_cost": latency_cost,
         },
     }
 
 
-def run_sweep(
-    args: argparse.Namespace,
+def run_experiment_sweep(
+    dimensions_list: Sequence[int],
+    seed_list: Sequence[int],
     training_records: Sequence[LabeledRecord],
     test_records: Sequence[LabeledRecord],
+    cost_profile_name: str = "unconfigured",
+    energy_cost: float | None = None,
+    latency_cost: float | None = None,
 ) -> Result:
-    """Run every requested dimension and seed combination."""
-    dimensions = args.sweep_dimensions or [args.dimensions]
-    seeds = args.sweep_seeds or [args.seed]
-    runs = [
-        run_experiment(
-            dimension,
-            seed,
-            training_records,
-            test_records,
-            cost_profile_name=args.cost_profile,
-            energy_cost=args.energy_cost,
-            latency_cost=args.latency_cost,
-        )
-        for dimension in dimensions
-        for seed in seeds
-    ]
-    best = max(runs, key=lambda run: (run["accuracy"], run["average_margin"]))
-    best_run = {
-        "dimensions": best["dimensions"],
-        "seed": best["seed"],
-        "accuracy": best["accuracy"],
-        "average_margin": best["average_margin"],
-    }
+    """Run an experiment sweep across dimensions and random seeds."""
+    runs: list[Result] = []
+    for dimensions in dimensions_list:
+        for seed in seed_list:
+            runs.append(
+                run_experiment(
+                    dimensions=dimensions,
+                    seed=seed,
+                    training_records=training_records,
+                    test_records=test_records,
+                    cost_profile_name=cost_profile_name,
+                    energy_cost=energy_cost,
+                    latency_cost=latency_cost,
+                )
+            )
+
+    best_run = max(
+        runs,
+        key=lambda run: (
+            float(run["accuracy"]),
+            float(run["average_margin"]),
+            float(run["macro_f1"]),
+        ),
+    )
+    average_accuracy = sum(float(run["accuracy"]) for run in runs) / len(runs)
+    average_macro_f1 = sum(float(run["macro_f1"]) for run in runs) / len(runs)
+    average_margin = sum(float(run["average_margin"]) for run in runs) / len(
+        runs
+    )
+
     return {
+        "experiment": "generic_categorical_baseline",
         "mode": "sweep",
         "runs": runs,
         "summary": {
             "run_count": len(runs),
-            "average_accuracy": sum(run["accuracy"] for run in runs) / len(runs),
-            "average_macro_f1": (
-                sum(run["macro_f1"] for run in runs) / len(runs)
-            ),
-            "average_margin": (
-                sum(run["average_margin"] for run in runs) / len(runs)
-            ),
-            "best_run": best_run,
+            "average_accuracy": average_accuracy,
+            "average_macro_f1": average_macro_f1,
+            "average_margin": average_margin,
+            "best_run": {
+                "dimensions": best_run["dimensions"],
+                "seed": best_run["seed"],
+                "accuracy": best_run["accuracy"],
+                "average_margin": best_run["average_margin"],
+            },
         },
     }
 
 
 def main() -> int:
     args = read_arguments()
+    is_sweep = bool(args.sweep_dimensions or args.sweep_seeds)
+
     if args.dataset:
-        training_records, test_records = load_dataset(args.dataset)
+        dataset = load_dataset(args.dataset)
+        training_records = dataset["training"]
+        test_records = dataset["test"]
     else:
-        training_records, test_records = TRAINING_RECORDS, TEST_RECORDS
+        training_records = EXAMPLE_DATASET
+        test_records = EXAMPLE_TEST_RECORDS
 
     if args.demo:
         print_demo_intro(training_records, test_records)
 
-    is_sweep = args.sweep_dimensions is not None or args.sweep_seeds is not None
     if is_sweep:
-        result = run_sweep(args, training_records, test_records)
+        sweep_dimensions = args.sweep_dimensions or [args.dimensions]
+        sweep_seeds = args.sweep_seeds or [args.seed]
+        result = run_experiment_sweep(
+            dimensions_list=sweep_dimensions,
+            seed_list=sweep_seeds,
+            training_records=training_records,
+            test_records=test_records,
+            cost_profile_name=args.cost_profile,
+            energy_cost=args.energy_cost,
+            latency_cost=args.latency_cost,
+        )
     else:
         result = run_experiment(
-            args.dimensions,
-            args.seed,
-            training_records,
-            test_records,
+            dimensions=args.dimensions,
+            seed=args.seed,
+            training_records=training_records,
+            test_records=test_records,
             cost_profile_name=args.cost_profile,
             energy_cost=args.energy_cost,
             latency_cost=args.latency_cost,
@@ -436,34 +533,42 @@ def main() -> int:
         write_csv_result(result, args.csv_output)
 
     if is_sweep:
-        print("Generic HDC experiment sweep")
         summary = result["summary"]
-        best_run = summary["best_run"]
-        print(f"sweep runs: {summary['run_count']}")
-        print(f"average accuracy: {summary['average_accuracy']:.1%}")
-        print(f"average macro F1: {summary['average_macro_f1']:.3f}")
-        print(f"average margin: {summary['average_margin']:.3f}")
-        print("run details:")
+        print("=" * 50)
+        print("  HDC CLASSIFIER — EXPERIMENT SWEEP")
+        print("=" * 50)
+        print()
+        print(f"  Runs: {summary['run_count']}")
+        print(f"  Average accuracy:  {_format_percent(summary['average_accuracy'])}")
+        print(f"  Average F1 score:  {summary['average_macro_f1']:.3f}")
+        print(f"  Average margin:    {summary['average_margin']:.3f}")
+        print()
+        print("  Run details:")
         for run in result["runs"]:
             print(
-                f"  dimensions={run['dimensions']} seed={run['seed']} "
-                f"accuracy={run['accuracy']:.1%} "
+                f"    dimensions={run['dimensions']} seed={run['seed']} "
+                f"accuracy={_format_percent(run['accuracy'])} "
                 f"F1={run['macro_f1']:.3f} "
                 f"margin={run['average_margin']:.3f}"
             )
+        best_run = summary["best_run"]
+        print()
         print(
-            "best run: "
-            f"dimensions={best_run['dimensions']}, seed={best_run['seed']}, "
-            f"accuracy={best_run['accuracy']:.1%}, "
+            f"  Best configuration: "
+            f"dimensions={best_run['dimensions']}, "
+            f"seed={best_run['seed']}, "
+            f"accuracy={_format_percent(best_run['accuracy'])}, "
             f"margin={best_run['average_margin']:.3f}"
         )
+        print()
+        print("=" * 50)
     else:
         print_result(result)
 
     if args.output:
-        print(f"\nsaved results: {args.output}")
+        print(f"\nSaved results: {args.output}")
     if args.csv_output:
-        print(f"\nsaved CSV: {args.csv_output}")
+        print(f"Saved CSV: {args.csv_output}")
     return 0
 
 

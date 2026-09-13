@@ -16,7 +16,7 @@ class SimpleCommandLineTests(unittest.TestCase):
             text=True,
         )
 
-        self.assertEqual(completed.stdout.strip(), "hdc-baseline 1.3.0")
+        self.assertEqual(completed.stdout.strip(), "hdc-baseline 1.4.0")
 
     def test_command_line_dimension_reaches_saved_result(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -38,8 +38,8 @@ class SimpleCommandLineTests(unittest.TestCase):
             )
             result = json.loads(output.read_text(encoding="utf-8"))
 
-        self.assertIn("dimensions: 30", completed.stdout)
-        self.assertIn("Generic HDC baseline", completed.stdout)
+        self.assertIn("HDC CLASSIFIER — RESULTS", completed.stdout)
+        self.assertIn("Dimensions: 30", completed.stdout)
         self.assertEqual(result["experiment"], "generic_categorical_baseline")
         self.assertEqual(result["dimensions"], 30)
         self.assertEqual(result["total"], 4)
@@ -47,26 +47,26 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertGreaterEqual(result["timing_ms"]["training"], 0.0)
         self.assertGreaterEqual(result["timing_ms"]["inference"], 0.0)
         self.assertGreaterEqual(result["timing_ms"]["total"], 0.0)
-        self.assertIn("training time:", completed.stdout)
-        self.assertIn("average margin:", completed.stdout)
-        self.assertIn("macro F1:", completed.stdout)
-        self.assertIn("classification report:", completed.stdout)
-        self.assertIn("confusion matrix:", completed.stdout)
-        self.assertIn("dataset:    6 training / 4 test / 2 classes", completed.stdout)
-        self.assertIn("accuracy bar: [###############-----] 75.0%", completed.stdout)
-        self.assertIn("[OK]", completed.stdout)
-        self.assertIn("[MISS]", completed.stdout)
-        self.assertIn(f"saved results: {output}", completed.stdout)
+        self.assertIn("Training time:", completed.stdout)
+        self.assertIn("Average margin:", completed.stdout)
+        self.assertIn("Overall score", completed.stdout)
+        self.assertIn("Breakdown by type:", completed.stdout)
+        self.assertIn("Prediction grid", completed.stdout)
+        self.assertIn("6 training examples", completed.stdout)
+        self.assertIn("Confidence:", completed.stdout)
+        self.assertIn("correct true=", completed.stdout)
+        self.assertIn("WRONG   true=", completed.stdout)
+        self.assertIn(f"Saved results: {output}", completed.stdout)
         self.assertEqual(result["dataset"]["training_records"], 6)
         self.assertEqual(result["dataset"]["test_records"], 4)
         self.assertEqual(result["dataset"]["classes"], ["class_a", "class_b"])
         self.assertGreater(result["model"]["item_vectors"], 0)
         self.assertEqual(result["model"]["prototype_vectors"], 2)
         self.assertEqual(result["model"]["memory_bytes"], result["memory_bytes"])
-        self.assertIn("model:", completed.stdout)
-        self.assertIn("item vectors:", completed.stdout)
-        self.assertIn("prototypes:", completed.stdout)
-        self.assertIn("memory:", completed.stdout)
+        self.assertIn("Model size:", completed.stdout)
+        self.assertIn("Learned patterns:", completed.stdout)
+        self.assertIn("Type averages:", completed.stdout)
+        self.assertIn("Memory used:", completed.stdout)
 
     def test_command_line_exports_predictions_to_csv(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -105,7 +105,7 @@ class SimpleCommandLineTests(unittest.TestCase):
         self.assertEqual(rows[0]["record"], "1")
         self.assertEqual(rows[0]["true_label"], "class_a")
         self.assertIn(rows[0]["correct"], {"True", "False"})
-        self.assertIn(f"saved CSV: {csv_output}", completed.stdout)
+        self.assertIn(f"Saved CSV: {csv_output}", completed.stdout)
 
     def test_command_line_runs_dimension_and_seed_sweep(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -141,15 +141,16 @@ class SimpleCommandLineTests(unittest.TestCase):
             set(result["summary"]["best_run"]),
             {"dimensions", "seed", "accuracy", "average_margin"},
         )
-        self.assertIn("sweep runs: 4", completed.stdout)
-        self.assertIn("average macro F1:", completed.stdout)
-        self.assertIn("average margin:", completed.stdout)
-        self.assertIn("run details:", completed.stdout)
+        self.assertIn("HDC CLASSIFIER — EXPERIMENT SWEEP", completed.stdout)
+        self.assertIn("Runs: 4", completed.stdout)
+        self.assertIn("Average accuracy:", completed.stdout)
+        self.assertIn("Average F1 score:", completed.stdout)
+        self.assertIn("Run details:", completed.stdout)
         self.assertIn("dimensions=30 seed=1", completed.stdout)
         self.assertIn("dimensions=60 seed=2", completed.stdout)
-        self.assertIn("F1=", completed.stdout)
-        self.assertIn("best run:", completed.stdout)
-        self.assertIn(f"saved results: {output}", completed.stdout)
+        self.assertIn("Best configuration:", completed.stdout)
+        self.assertIn(f"Saved results: {output}", completed.stdout)
+        self.assertIn("=" * 50, completed.stdout)
 
     def test_command_line_exports_sweep_summary_to_csv(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -193,7 +194,7 @@ class SimpleCommandLineTests(unittest.TestCase):
             {(row["dimensions"], row["seed"]) for row in rows},
             {("30", "1"), ("30", "2"), ("60", "1"), ("60", "2")},
         )
-        self.assertIn(f"saved CSV: {csv_output}", completed.stdout)
+        self.assertIn(f"Saved CSV: {csv_output}", completed.stdout)
 
     def test_command_line_demo_explains_the_built_in_example(self):
         completed = subprocess.run(
@@ -211,32 +212,32 @@ class SimpleCommandLineTests(unittest.TestCase):
             text=True,
         )
 
-        self.assertIn("HDC demo", completed.stdout)
+        self.assertIn("HDC CLASSIFIER — DEMO", completed.stdout)
         self.assertIn(
-            "Learn to tell class_a and class_b apart using color, shape, and size.",
+            "It learns to tell class_a and class_b apart",
             completed.stdout,
         )
-        self.assertIn("Training examples:", completed.stdout)
+        self.assertIn("Training examples (what it learns from):", completed.stdout)
         self.assertIn(
             "class_a: color=red, shape=circle, size=small", completed.stdout
         )
         self.assertIn(
             "class_b: color=blue, shape=square, size=medium", completed.stdout
         )
-        self.assertIn("How HDC handles the examples:", completed.stdout)
-        self.assertIn("1. Encode each record as a hypervector.", completed.stdout)
+        self.assertIn("How it works:", completed.stdout)
+        self.assertIn("1. Each record is turned into a long list of numbers.", completed.stdout)
         self.assertIn(
-            "2. Bundle the training records into class prototypes.", completed.stdout
+            "2. Records of the same type are grouped into an average.", completed.stdout
         )
         self.assertIn(
-            "3. Compare each test record with those prototypes.", completed.stdout
+            "3. New records are compared to those averages to guess their type.", completed.stdout
         )
-        self.assertIn("training records: 6", completed.stdout)
-        self.assertIn("test records:     4", completed.stdout)
-        self.assertIn("Test examples (labels hidden during prediction):", completed.stdout)
+        self.assertIn("Training data: 6 examples", completed.stdout)
+        self.assertIn("Test data:     4 examples", completed.stdout)
+        self.assertIn("Test examples (the computer will try to guess these):", completed.stdout)
         self.assertIn("color=orange, shape=square, size=small", completed.stdout)
         self.assertIn("color=blue, shape=triangle, size=medium", completed.stdout)
-        self.assertIn("accuracy:   4/4", completed.stdout)
+        self.assertIn("=" * 50, completed.stdout)
 
     def test_command_line_uses_named_cost_profile(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
