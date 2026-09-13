@@ -6,70 +6,84 @@ I built this project to understand how Hyperdimensional Computing can be used fo
 
 I cold-emailed more than 100 professors before hearing back from a professor at Texas State University. He was exploring how hyperdimensional computing could be used on Internet of Things devices, such as sensors in agricultural or medical applications. As part of that work, he asked me to create a baseline simulator. This project is one of the baselines I have been working on.
 
-## What is Hyperdimensional Computing (HDC)?
+## What is Hyperdimensional Computing?
 
-Hyperdimensional Computing is a brain-inspired AI approach based on high-dimensional vectors (hypervectors, typically 10,000 numbers of `-1` and `+1`).
+Hyperdimensional Computing (HDC) is a brain-inspired way of doing machine learning using long vectors of numbers (hypervectors, usually 10,000 numbers of -1 and +1).
 
-Unlike standard deep neural networks that require heavy backpropagation, thousands of matrix multiplications, and high-power GPUs:
-- **Fast one-pass learning**: Patterns are encoded and bundled in a single pass without iterative training.
-- **Ultra-lightweight math**: Operations are primarily element-wise multiplication (binding) and vector addition (bundling).
-- **Edge & IoT friendly**: Extremely low compute, energy, and memory footprints, making it ideal for microcontrollers and wearable sensors.
+Instead of training deep neural networks with backpropagation and heavy GPU compute:
+- It learns in a single pass without iterative training loops.
+- It uses simple math like element-wise multiplication and vector addition.
+- It takes very little memory and power, which makes it great for small microcontrollers and sensors.
 
 ## Try the demo
 
-Download the ZIP for your computer from the [latest release](https://github.com/mastercoder26/HDCexperiment/releases/latest), extract it, and open a terminal in that folder. Python is not required.
+1. Download the ZIP for your computer from the [latest release](https://github.com/mastercoder26/HDCexperiment/releases/latest).
+2. Extract the ZIP file.
+3. Open your terminal and change into the folder where you extracted the download. For example on a Mac:
 
-Windows:
-
-```powershell
-.\hdc-baseline.exe --demo
+```bash
+cd ~/Downloads/hdc-baseline-macos-arm64
 ```
 
-macOS or Linux:
+### Running on macOS
+Apple will block the file from running with a warning because it is not signed with an Apple developer certificate. To get rid of that warning, run this in your terminal while inside the extracted folder:
+
+```bash
+xattr -cr hdc-baseline
+```
+
+Then run the demo:
 
 ```bash
 ./hdc-baseline --demo
 ```
 
-Whenever you run it, the program:
-1. **Explains what it is doing**: Outlines the dataset, classes, and how hypervectors encode features.
-2. **Executes the training and predictions**: Shows an accuracy bar, confidence margins, class breakdown, prediction grid, and individual predictions.
-3. **Interprets the results in plain English**: Explains what the accuracy, confidence margin, and hardware efficiency numbers mean for real-world edge deployment.
+### Running on Windows
+Open PowerShell in the extracted folder and run:
 
-If macOS blocks the unsigned file, run:
-
-```bash
-xattr -d com.apple.quarantine hdc-baseline
+```powershell
+.\hdc-baseline.exe --demo
 ```
 
-On Windows, choose **More info**, then **Run anyway** if SmartScreen appears. On Linux, run `chmod +x hdc-baseline` if the file is not executable.
+If Windows SmartScreen shows a popup, click **More info** and then **Run anyway**.
+
+### Running on Linux
+Make sure the file is executable, then run it:
+
+```bash
+chmod +x hdc-baseline
+./hdc-baseline --demo
+```
+
+## What the program does when you run it
+
+When you run `./hdc-baseline` or `./hdc-baseline --demo`, it walks you through three things:
+
+1. **Description**: It explains what HDC is, lists the training examples, and shows the test records.
+2. **Execution**: It trains the model in one pass, evaluates the test records, and prints accuracy, confidence margins, and a confusion matrix.
+3. **Interpretation**: It gives a plain English breakdown of what the accuracy and confidence margins mean, plus how much memory and simulated energy the run took.
 
 ## How it works
 
-Each field and value gets a random vector made of `-1` and `+1` values. The program then:
+Every category name and value gets its own random vector of -1 and +1 values. The program then:
 
-1. **Binds** each field to its value using element-wise multiplication.
-2. **Bundles** the fields into one vector for the full record using addition.
-3. **Bundles** training records into an average prototype vector for each class.
-4. **Compares** unseen test records with the prototypes using cosine similarity.
+1. Binds each field to its value using multiplication.
+2. Bundles the fields together into one vector for the record using addition.
+3. Bundles the training records together into an average prototype vector for each class.
+4. Compares test records to those class prototypes using cosine similarity.
 
-The class with the highest similarity score becomes the prediction. The random seed is fixed by default, so the same command gives repeatable results.
+The class with the highest similarity wins. The random seed is set to 42 by default so you get the same result every time you run it.
 
-## How to interpret the output
+## Understanding the output
 
-When you run the classifier, each section tells you something specific:
+- **Accuracy & Confidence Bar**: Shows how many test examples it got right.
+- **Average Margin**: How much higher the winning class score was compared to the runner-up. Anything over 0.3 means high confidence.
+- **Breakdown by Type**: Precision, recall, and F1 score for each class.
+- **Prediction Grid**: A confusion matrix where rows are actual classes and columns are what the model guessed.
+- **Performance**: Total work units, estimated energy, and runtime.
+- **Interpretation**: A quick summary explaining the results and why the low compute footprint matters for edge devices.
 
-| Output Section | What It Tells You |
-| --- | --- |
-| **Intro & Description** | Summarizes HDC principles, the classes being learned, and the number of examples. |
-| **Confidence & Accuracy** | The percentage of test records correctly identified, visual progress bar, and F1 score. |
-| **Average Margin** | The difference in similarity between the winning class and the runner-up. Margins above `0.3` indicate high decision confidence. |
-| **Breakdown by Type** | Precision, recall, and F1 score for every individual category. |
-| **Prediction Grid** | A confusion matrix displaying actual types as rows and guessed types as columns. |
-| **Performance & Hardware** | Estimated work units, latency, energy consumption, and memory footprint. |
-| **Interpretation** | Plain-language summary explaining what the scores mean and why the efficiency numbers matter for edge hardware. |
-
-The included dataset is intentionally small. Its accuracy shows that the pipeline works, not that it is ready for a real-world classification task. The `example_edge` energy and latency numbers are also estimates, not hardware measurements.
+The included example dataset is small on purpose so you can trace every step. The energy and latency numbers are analytical estimates, not direct hardware measurements.
 
 ## Other commands
 
@@ -77,27 +91,27 @@ The included dataset is intentionally small. Its accuracy shows that the pipelin
 # Run with default settings (explains HDC, trains, and interprets results)
 ./hdc-baseline
 
-# Show the installed release version
+# Show version
 ./hdc-baseline --version
 
-# Change the vector size and random seed
+# Change the vector size and seed
 ./hdc-baseline --dimensions 5000 --seed 7
 
-# Compare several configurations and save the full results
+# Compare different vector dimensions and seeds
 ./hdc-baseline --sweep-dimensions 1000,5000 --sweep-seeds 7,42 --output sweep.json
 
-# Export a compact sweep summary for a spreadsheet or plotting tool
+# Save a CSV summary of a sweep
 ./hdc-baseline --sweep-dimensions 1000,5000 --sweep-seeds 7,42 --csv-output sweep.csv
 
-# Load your own categorical dataset and export prediction rows
+# Run on your own JSON dataset and export predictions to CSV
 ./hdc-baseline --dataset dataset.json --output result.json --csv-output predictions.csv
 ```
 
-Use `./hdc-baseline --help` to see every option. For a normal run, the CSV contains one row per prediction with every class score. For a sweep, it contains one row per dimensions/seed combination with accuracy, macro F1, margin, memory, operation totals, cost estimates, and timing.
+Run `./hdc-baseline --help` to see all available flags.
 
 ## Challenges
 
-The hardest part was understanding how ordinary field/value data could be represented with hypervectors. I also had to make the random vectors repeatable, validate custom datasets, and package NumPy into standalone builds for each operating system.
+The hardest part was figuring out how normal categorical data maps into hypervectors. I also had to make sure the random vectors stayed reproducible, add dataset validation, and package NumPy into standalone binaries for Windows, Linux, and macOS without needing Python installed.
 
 ## What I want to add next
 
@@ -115,4 +129,4 @@ python3 -m venv .venv
 .venv/bin/python -m pytest
 ```
 
-The main implementation is in `hdc/core.py`, `hdc/model.py`, and `main.py`. GitHub Actions builds the Windows, macOS, and Linux release files with PyInstaller.
+The core code is in `hdc/core.py`, `hdc/model.py`, and `main.py`. GitHub Actions builds the binaries with PyInstaller on every tagged release.
